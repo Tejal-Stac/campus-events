@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import Navbar from '../components/Navbar'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const roles = [
   { id: 'student', label: 'Student', icon: '🎓', desc: 'Access events & certificates' },
@@ -15,7 +15,14 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
+  const location = useLocation()
+  const { login } = useAuth()
+
+  // Get the page user was trying to access before being redirected to login
+  const from = location.state?.from?.pathname || null
 
   const validateEmail = (email) => {
     if (email && !email.endsWith('@vit.edu')) {
@@ -25,19 +32,44 @@ export default function Login() {
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!email.endsWith('@vit.edu')) {
       setEmailError('Only @vit.edu email addresses are allowed')
       return
     }
 
-    // Navigate to correct dashboard based on role
-    if (selectedRole === 'student') navigate('/dashboard')
-    else if (selectedRole === 'faculty') navigate('/faculty')
-    else if (selectedRole === 'coordinator') navigate('/coordinator')
-    else if (selectedRole === 'volunteer') navigate('/volunteer')
-    else if (selectedRole === 'dean') navigate('/admin')
+    setLoading(true)
+    setError('')
+
+    try {
+      const user = await login(email, password)
+      
+      // If user was trying to access a specific page, redirect them there
+      if (from && from !== '/login') {
+        navigate(from, { replace: true })
+        return
+      }
+
+      // Otherwise, navigate based on role
+      const roleRedirectMap = {
+        student: '/dashboard',
+        faculty: '/faculty-dashboard',
+        coordinator: '/coord-dashboard',
+        club_head: '/coord-dashboard',
+        volunteer: '/volunteer',
+        dean: '/dean-dashboard',
+        admin: '/admin'
+      }
+      
+      const redirectPath = roleRedirectMap[user.role] || '/dashboard'
+      navigate(redirectPath, { replace: true })
+      
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const inputStyle = {
@@ -48,9 +80,7 @@ export default function Login() {
 
   return (
     <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-      <Navbar />
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px', paddingTop: '80px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px' }}>
         <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '20px', width: '100%', maxWidth: '480px', padding: '40px', boxShadow: '0 8px 32px rgba(26,58,107,0.08)' }}>
 
           {/* Header */}
@@ -88,6 +118,13 @@ export default function Login() {
             </span>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+              <p style={{ color: '#dc2626', fontSize: '13px', fontWeight: '600' }}>⚠️ {error}</p>
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
@@ -116,9 +153,9 @@ export default function Login() {
                 onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
             </div>
 
-            <button type="submit"
-              style={{ background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', marginTop: '4px' }}>
-              Sign In as {roles.find(r => r.id === selectedRole)?.label} →
+            <button type="submit" disabled={loading}
+              style={{ background: loading ? '#94a3b8' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer', marginTop: '4px' }}>
+              {loading ? 'Signing in...' : `Sign In as ${roles.find(r => r.id === selectedRole)?.label} →`}
             </button>
           </form>
 

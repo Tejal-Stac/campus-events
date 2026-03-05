@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import Navbar from '../components/Navbar'
 
 const upcomingEvents = [
   {
@@ -144,8 +143,6 @@ const features = [
 export default function Home() {
   return (
     <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-      <Navbar />
-
       {/* Hero Section */}
       <div style={{ background: 'linear-gradient(135deg, #1a3a6b 0%, #2563eb 100%)', paddingTop: '56px' }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '64px 24px', textAlign: 'center' }}>

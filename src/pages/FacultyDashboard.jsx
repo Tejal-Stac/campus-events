@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const facultyInfo = {
   name: 'Dr. Rajesh Sharma',
@@ -87,6 +88,8 @@ const pendingApprovals = [
 ]
 
 export default function FacultyDashboard() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
   const [newEvent, setNewEvent] = useState({
     title: '',
@@ -118,6 +121,21 @@ export default function FacultyDashboard() {
     color: '#1a3a6b', fontSize: '13px', fontWeight: '600',
     display: 'block', marginBottom: '6px'
   }
+
+  // Role-based protection: Redirect if not faculty
+  useEffect(() => {
+    if (user && user.role !== 'faculty') {
+      const roleRedirectMap = {
+        student: '/dashboard',
+        coordinator: '/coord-dashboard',
+        club_head: '/coord-dashboard',
+        dean: '/dean-dashboard',
+        admin: '/admin'
+      }
+      const redirectPath = roleRedirectMap[user.role] || '/dashboard'
+      navigate(redirectPath, { replace: true })
+    }
+  }, [user, navigate])
 
   const tabs = [
     { id: 'overview', label: '📊 Overview' },

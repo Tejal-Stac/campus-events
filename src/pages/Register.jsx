@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import Navbar from '../components/Navbar'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const departments = ['Computer Engineering', 'IT', 'Mechanical', 'Civil', 'ENTC', 'MBA', 'MCA']
 const divisions = ['A', 'B', 'C', 'D']
@@ -8,8 +8,12 @@ const interests = ['Hackathons', 'Cultural', 'Sports', 'Seminars', 'Workshops', 
 const campuses = ['Kondhwa', 'Bibwewadi']
 
 export default function Register() {
+  const navigate = useNavigate()
+  const { register } = useAuth()
   const [role, setRole] = useState('student')
   const [step, setStep] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', password: '',
     department: '', division: '', year: '', grNumber: '',
@@ -49,6 +53,31 @@ export default function Register() {
     return true
   }
 
+  const handleRegister = async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const userData = {
+        name: `${form.firstName} ${form.lastName}`,
+        email: form.email,
+        password: form.password,
+        role: role,
+      }
+
+      await register(userData)
+      
+      alert(`🎉 Welcome ${form.firstName}! Your account has been created successfully. You can now login!`)
+      navigate('/login')
+      
+    } catch (err) {
+      setError(err.response?.data?.message || 'Registration failed. Please try again.')
+      setStep(1) // Go back to first step to show error
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const inputStyle = {
     background: '#f8faff', border: '1px solid #cbd5e1', color: '#1a3a6b',
     borderRadius: '10px', width: '100%', padding: '12px 14px',
@@ -58,9 +87,7 @@ export default function Register() {
 
   return (
     <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-      <Navbar />
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px', paddingTop: '80px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px' }}>
         <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '20px', width: '100%', maxWidth: '520px', padding: '40px', boxShadow: '0 8px 32px rgba(26,58,107,0.08)' }}>
 
           {/* Header */}
@@ -111,6 +138,13 @@ export default function Register() {
               </span>
             ))}
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
+              <p style={{ color: '#dc2626', fontSize: '13px', fontWeight: '600' }}>⚠️ {error}</p>
+            </div>
+          )}
 
           {/* ── STEP 1 – Personal Info ── */}
           {step === 1 && (
@@ -326,9 +360,9 @@ export default function Register() {
                   style={{ flex: 1, background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                   ← Back
                 </button>
-                <button onClick={() => alert(`🎉 Welcome ${form.firstName}! Your account has been created successfully. You can now login!`)}
-                  style={{ flex: 2, background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
-                  🎉 Create Account
+                <button onClick={handleRegister} disabled={loading}
+                  style={{ flex: 2, background: loading ? '#94a3b8' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer' }}>
+                  {loading ? 'Creating Account...' : '🎉 Create Account'}
                 </button>
               </div>
             </div>

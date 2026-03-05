@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import Navbar from '../components/Navbar'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const myEvents = [
   { id: 1, title: 'National Hackathon 2025', date: 'Mar 15, 2025', category: 'Hackathon', registered: 89, seats: 120, status: 'Active', volunteers: 12 },
@@ -17,9 +18,25 @@ const volunteers = [
 const duties = ['Registration Desk', 'Stage Management', 'Food & Logistics', 'Judging Coordination', 'Photography', 'Security', 'Guest Handling']
 
 export default function CoordinatorDashboard() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
   const [newEvent, setNewEvent] = useState({ title: '', date: '', category: '', seats: '', venue: '', desc: '' })
   const updateEvent = (field, value) => setNewEvent(prev => ({ ...prev, [field]: value }))
+
+  // Role-based protection: Redirect if not coordinator/club_head
+  useEffect(() => {
+    if (user && user.role !== 'coordinator' && user.role !== 'club_head') {
+      const roleRedirectMap = {
+        student: '/dashboard',
+        faculty: '/faculty-dashboard',
+        dean: '/dean-dashboard',
+        admin: '/admin'
+      }
+      const redirectPath = roleRedirectMap[user.role] || '/dashboard'
+      navigate(redirectPath, { replace: true })
+    }
+  }, [user, navigate])
 
   const inputStyle = {
     background: '#f8faff', border: '1px solid #cbd5e1', color: '#1a3a6b',

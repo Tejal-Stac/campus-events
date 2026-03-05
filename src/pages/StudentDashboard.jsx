@@ -1,68 +1,120 @@
 import { Link } from 'react-router-dom'
-
-const student = {
-  name: 'Tejal Jadhav',
-  branch: 'BTech-Computer Engineering',
-  year: '3rd Year',
-  avatar: 'TJ',
-  rollNo: 'VIT2023CSE045',
-  eventsAttended: 12,
-  certificates: 8,
-  skillsGained: 15,
-  points: 1240,
-}
-
-const upcomingEvents = [
-  { id: 1, title: 'National Hackathon 2025', date: 'Mar 15, 2025', category: 'Hackathon', status: 'Registered' },
-  { id: 2, title: 'Tech Talk: AI & Future', date: 'Apr 2, 2025', category: 'Seminar', status: 'Registered' },
-  { id: 3, title: 'Photography Workshop', date: 'Apr 18, 2025', category: 'Workshop', status: 'Waitlisted' },
-]
-
-const pastEvents = [
-  { id: 1, title: 'CodeSprint 2024', date: 'Nov 10, 2024', role: 'Participant', skills: ['Problem Solving', 'C++'], cert: true },
-  { id: 2, title: 'Cultural Fest 2024', date: 'Oct 5, 2024', role: 'Volunteer', skills: ['Leadership', 'Coordination'], cert: true },
-  { id: 3, title: 'ML Workshop', date: 'Sep 20, 2024', role: 'Participant', skills: ['Python', 'Machine Learning'], cert: true },
-]
-
-const aiSuggestions = [
-  { title: 'Robotics Competition', match: '94%', reason: 'Based on your tech event history' },
-  { title: 'Industry Connect – CSE', match: '88%', reason: 'Matches your branch & year' },
-  { title: 'Finance & Startup Summit', match: '76%', reason: 'Similar seminars attended' },
-]
-
-const skills = ['Python', 'Machine Learning', 'C++', 'Problem Solving', 'Leadership', 'Coordination', 'Teamwork', 'Public Speaking']
+import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
+import { userService } from '../api/userService'
+import { eventService } from '../api/eventService'
 
 export default function StudentDashboard() {
-  return (
-    <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+  const { user } = useAuth()
+  const [student, setStudent] = useState(null)
+  const [upcomingEvents, setUpcomingEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-      {/* Top Navbar - VIT Style */}
-      <div style={{ background: '#1a3a6b', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '56px', position: 'fixed', top: 0, width: '100%', zIndex: 100, boxSizing: 'border-box' }}>
-        <div className="flex items-center gap-3">
-          <div style={{ background: '#fff', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', color: '#1a3a6b', fontSize: '13px' }}>CE</div>
-          <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px' }}>CampusEvents</span>
-          <span style={{ color: '#93c5fd', fontSize: '13px' }}>· Vishwakarma Institute of Technology, Pune</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span style={{ color: '#93c5fd', fontSize: '13px' }}>🔔</span>
-          <div style={{ background: '#2563eb', borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '13px' }}>TJ</div>
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      // Fetch user profile from PostgreSQL
+      const profile = await userService.getProfile()
+      setStudent(profile)
+      
+      // Fetch user's registered events from PostgreSQL
+      const registrations = await userService.getMyRegistrations()
+      
+      // Filter upcoming events (events with date >= today)
+      const now = new Date()
+      const upcoming = registrations?.filter(event => {
+        const eventDate = new Date(event.date)
+        return eventDate >= now
+      }) || []
+      
+      setUpcomingEvents(upcoming)
+      setError(null)
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err)
+      setError('Failed to load dashboard data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ background: '#f0f4ff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '56px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <p style={{ color: '#1a3a6b', fontSize: '16px', fontWeight: '600' }}>Loading your dashboard...</p>
         </div>
       </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ background: '#f0f4ff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '56px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>❌</div>
+          <p style={{ color: '#dc2626', fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>{error}</p>
+          <button onClick={fetchDashboardData} style={{ background: '#2563eb', color: '#fff', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600' }}>
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!student) {
+    return (
+      <div style={{ background: '#f0f4ff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '56px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+          <p style={{ color: '#1a3a6b', fontSize: '16px', fontWeight: '600' }}>Please log in to view your dashboard</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Get user initials for avatar
+  const getInitials = (name) => {
+    return name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'NA'
+  }
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  // Dummy data for features not yet implemented with real data
+  const aiSuggestions = [
+    { title: 'Robotics Competition', match: '94%', reason: 'Based on your tech event history' },
+    { title: 'Industry Connect – CSE', match: '88%', reason: 'Matches your branch & year' },
+    { title: 'Finance & Startup Summit', match: '76%', reason: 'Similar seminars attended' },
+  ]
+
+  const skills = ['Python', 'Machine Learning', 'C++', 'Problem Solving', 'Leadership', 'Coordination', 'Teamwork', 'Public Speaking']
+
+  return (
+    <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
 
       {/* Student Info Bar - VIT Style */}
       <div style={{ background: '#fff', borderBottom: '1px solid #dbeafe', padding: '10px 24px', marginTop: '56px', display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
         <div className="flex items-center gap-3">
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#1a3a6b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '16px' }}>TJ</div>
+          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#1a3a6b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '16px' }}>{getInitials(student?.name)}</div>
           <div>
-            <p style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '15px' }}>{student.name}</p>
+            <p style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '15px' }}>{student?.name || 'Student'}</p>
             <div className="flex items-center gap-2">
               <span style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '20px', fontSize: '11px', padding: '2px 10px', fontWeight: '600' }}>● Active</span>
             </div>
           </div>
         </div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>Registration No: <strong style={{ color: '#1a3a6b' }}>{student.rollNo}</strong></div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>Programme: <strong style={{ color: '#1a3a6b' }}>{student.branch}</strong></div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>Year: <strong style={{ color: '#1a3a6b' }}>{student.year}</strong></div>
+        <div style={{ color: '#64748b', fontSize: '13px' }}>Email: <strong style={{ color: '#1a3a6b' }}>{student?.email || 'N/A'}</strong></div>
+        <div style={{ color: '#64748b', fontSize: '13px' }}>Role: <strong style={{ color: '#1a3a6b' }}>{student?.role || 'Student'}</strong></div>
+        <div style={{ color: '#64748b', fontSize: '13px' }}>Points: <strong style={{ color: '#1a3a6b' }}>{student?.points || 0}</strong></div>
       </div>
 
       {/* Breadcrumb */}
@@ -75,10 +127,10 @@ export default function StudentDashboard() {
         {/* Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Events Attended', value: student.eventsAttended, icon: '🎯', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
-            { label: 'Certificates', value: student.certificates, icon: '📜', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
-            { label: 'Skills Gained', value: student.skillsGained, icon: '💡', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
-            { label: 'Points Earned', value: student.points, icon: '⭐', bg: '#fdf4ff', color: '#7e22ce', border: '#e9d5ff' },
+            { label: 'Events Registered', value: upcomingEvents?.length || 0, icon: '🎯', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+            { label: 'Certificates', value: 0, icon: '📜', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+            { label: 'Skills Gained', value: 0, icon: '💡', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
+            { label: 'Points Earned', value: student?.points || 0, icon: '⭐', bg: '#fdf4ff', color: '#7e22ce', border: '#e9d5ff' },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: '12px', textAlign: 'center', padding: '20px' }}>
               <div className="text-2xl mb-1">{s.icon}</div>
@@ -122,48 +174,40 @@ export default function StudentDashboard() {
                 <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px' }}>📅 My Upcoming Events</h2>
                 <Link to="/events" style={{ color: '#2563eb', fontSize: '12px', textDecoration: 'none' }}>View all →</Link>
               </div>
-              <div className="flex flex-col gap-3">
-                {upcomingEvents.map(e => (
-                  <div key={e.id} style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '14px' }} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div style={{ background: '#dbeafe', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>🎫</div>
-                      <div>
-                        <p style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '600' }}>{e.title}</p>
-                        <p style={{ color: '#64748b', fontSize: '12px' }}>{e.date} · {e.category}</p>
+              {upcomingEvents?.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
+                  <p style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>No upcoming events</p>
+                  <p style={{ fontSize: '12px' }}>Register for events to see them here</p>
+                  <Link to="/events" style={{ display: 'inline-block', marginTop: '16px', background: '#2563eb', color: '#fff', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontSize: '12px' }}>Browse Events</Link>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {upcomingEvents?.map(e => (
+                    <div key={e.event_id} style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '14px' }} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div style={{ background: '#dbeafe', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>🎫</div>
+                        <div>
+                          <p style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '600' }}>{e.title}</p>
+                          <p style={{ color: '#64748b', fontSize: '12px' }}>{formatDate(e.date)} · {e.category || 'Event'}</p>
+                        </div>
                       </div>
+                      <span style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '6px', fontSize: '11px', padding: '3px 10px', fontWeight: '600' }}>
+                        Registered
+                      </span>
                     </div>
-                    <span style={{ background: e.status === 'Registered' ? '#dcfce7' : '#fef9c3', color: e.status === 'Registered' ? '#16a34a' : '#a16207', borderRadius: '6px', fontSize: '11px', padding: '3px 10px', fontWeight: '600' }}>
-                      {e.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Participation History */}
             <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
               <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px', marginBottom: '16px' }}>🏆 Participation History</h2>
-              <div className="flex flex-col gap-3">
-                {pastEvents.map(e => (
-                  <div key={e.id} style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '14px' }}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '600' }}>{e.title}</p>
-                        <p style={{ color: '#64748b', fontSize: '12px' }}>{e.date} · Role: <span style={{ color: '#2563eb', fontWeight: '600' }}>{e.role}</span></p>
-                      </div>
-                      {e.cert && (
-                        <button style={{ background: '#dcfce7', color: '#15803d', border: 'none', borderRadius: '8px', fontSize: '11px', padding: '5px 12px', cursor: 'pointer', fontWeight: '600' }}>
-                          📜 Download
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {e.skills.map(s => (
-                        <span key={s} style={{ background: '#eff6ff', color: '#1d4ed8', borderRadius: '6px', fontSize: '11px', padding: '2px 8px', border: '1px solid #bfdbfe' }}>{s}</span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📅</div>
+                <p style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Coming Soon</p>
+                <p style={{ fontSize: '12px' }}>Past event participation will appear here</p>
               </div>
             </div>
           </div>

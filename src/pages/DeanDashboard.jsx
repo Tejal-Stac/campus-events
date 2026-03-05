@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const pendingEvents = [
   {
@@ -90,6 +91,8 @@ const allEvents = [
 const duties = ['Registration Desk', 'Stage Management', 'Food & Logistics', 'Judging Coordination', 'Photography', 'Security', 'Guest Handling']
 
 export default function DeanDashboard() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
   const [users, setUsers] = useState(allUsers)
   const [events, setEvents] = useState(pendingEvents)
@@ -99,6 +102,20 @@ export default function DeanDashboard() {
   const [assignRole, setAssignRole] = useState('Coordinator')
   const [assignDuty, setAssignDuty] = useState(duties[0])
   const [assignEvent, setAssignEvent] = useState(allEvents[0].title)
+
+  // Role-based protection: Redirect if not dean/admin
+  useEffect(() => {
+    if (user && user.role !== 'dean' && user.role !== 'admin') {
+      const roleRedirectMap = {
+        student: '/dashboard',
+        faculty: '/faculty-dashboard',
+        coordinator: '/coord-dashboard',
+        club_head: '/coord-dashboard'
+      }
+      const redirectPath = roleRedirectMap[user.role] || '/dashboard'
+      navigate(redirectPath, { replace: true })
+    }
+  }, [user, navigate])
 
   const approveEvent = (id) => setEvents(prev => prev.map(e => e.id === id ? { ...e, status: 'Approved' } : e))
   const rejectEvent = (id) => setEvents(prev => prev.map(e => e.id === id ? { ...e, status: 'Rejected' } : e))
