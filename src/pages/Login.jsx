@@ -15,6 +15,8 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
   const validateEmail = (email) => {
@@ -25,19 +27,42 @@ export default function Login() {
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!email.endsWith('@vit.edu')) {
       setEmailError('Only @vit.edu email addresses are allowed')
       return
     }
 
-    // Navigate to correct dashboard based on role
-    if (selectedRole === 'student') navigate('/dashboard')
-    else if (selectedRole === 'faculty') navigate('/faculty')
-    else if (selectedRole === 'coordinator') navigate('/coordinator')
-    else if (selectedRole === 'volunteer') navigate('/volunteer')
-    else if (selectedRole === 'dean') navigate('/admin')
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, role: selectedRole })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('user', JSON.stringify(data.user))
+
+        if (selectedRole === 'student') navigate('/dashboard')
+        else if (selectedRole === 'faculty') navigate('/faculty')
+        else if (selectedRole === 'coordinator') navigate('/coordinator')
+        else if (selectedRole === 'volunteer') navigate('/volunteer')
+        else if (selectedRole === 'dean') navigate('/admin')
+      } else {
+        setError(data.message || 'Login failed!')
+      }
+    } catch (err) {
+      setError('Cannot connect to server! Make sure backend is running.')
+    }
+
+    setLoading(false)
   }
 
   const inputStyle = {
@@ -64,7 +89,7 @@ export default function Login() {
           <p style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '700', marginBottom: '10px' }}>Select your role</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '24px' }}>
             {roles.map(r => (
-              <button key={r.id} onClick={() => setSelectedRole(r.id)}
+              <button key={r.id} onClick={() => { setSelectedRole(r.id); setError('') }}
                 style={{
                   padding: '10px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '600',
                   cursor: 'pointer', textAlign: 'left',
@@ -87,6 +112,13 @@ export default function Login() {
               Signing in as: {roles.find(r => r.id === selectedRole)?.label}
             </span>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
+              <p style={{ color: '#dc2626', fontSize: '13px' }}>⚠️ {error}</p>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -116,13 +148,12 @@ export default function Login() {
                 onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
             </div>
 
-            <button type="submit"
-              style={{ background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', marginTop: '4px' }}>
-              Sign In as {roles.find(r => r.id === selectedRole)?.label} →
+            <button type="submit" disabled={loading}
+              style={{ background: loading ? '#94a3b8' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer', marginTop: '4px' }}>
+              {loading ? '⏳ Signing in...' : `Sign In as ${roles.find(r => r.id === selectedRole)?.label} →`}
             </button>
           </form>
 
-          {/* Info box for Coordinator/Volunteer */}
           {(selectedRole === 'coordinator' || selectedRole === 'volunteer') && (
             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '12px', marginTop: '16px', textAlign: 'center' }}>
               <p style={{ color: '#a16207', fontSize: '12px' }}>
