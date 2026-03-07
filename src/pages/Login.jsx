@@ -15,8 +15,13 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [emailError, setEmailError] = useState('')
+<<<<<<< HEAD
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+=======
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+>>>>>>> a1ebcb0 (Connect frontend to backend - Register and Login with PostgreSQL)
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
@@ -43,6 +48,7 @@ export default function Login() {
     setError('')
 
     try {
+<<<<<<< HEAD
       const user = await login(email, password)
       
       // If user was trying to access a specific page, redirect them there
@@ -70,6 +76,33 @@ export default function Login() {
     } finally {
       setLoading(false)
     }
+=======
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, role: selectedRole })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('user', JSON.stringify(data.user))
+
+        if (selectedRole === 'student') navigate('/dashboard')
+        else if (selectedRole === 'faculty') navigate('/faculty')
+        else if (selectedRole === 'coordinator') navigate('/coordinator')
+        else if (selectedRole === 'volunteer') navigate('/volunteer')
+        else if (selectedRole === 'dean') navigate('/admin')
+      } else {
+        setError(data.message || 'Login failed!')
+      }
+    } catch (err) {
+      setError('Cannot connect to server! Make sure backend is running.')
+    }
+
+    setLoading(false)
+>>>>>>> a1ebcb0 (Connect frontend to backend - Register and Login with PostgreSQL)
   }
 
   const inputStyle = {
@@ -94,7 +127,7 @@ export default function Login() {
           <p style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '700', marginBottom: '10px' }}>Select your role</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '24px' }}>
             {roles.map(r => (
-              <button key={r.id} onClick={() => setSelectedRole(r.id)}
+              <button key={r.id} onClick={() => { setSelectedRole(r.id); setError('') }}
                 style={{
                   padding: '10px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '600',
                   cursor: 'pointer', textAlign: 'left',
@@ -120,8 +153,13 @@ export default function Login() {
 
           {/* Error Message */}
           {error && (
+<<<<<<< HEAD
             <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
               <p style={{ color: '#dc2626', fontSize: '13px', fontWeight: '600' }}>⚠️ {error}</p>
+=======
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
+              <p style={{ color: '#dc2626', fontSize: '13px' }}>⚠️ {error}</p>
+>>>>>>> a1ebcb0 (Connect frontend to backend - Register and Login with PostgreSQL)
             </div>
           )}
 
@@ -155,11 +193,14 @@ export default function Login() {
 
             <button type="submit" disabled={loading}
               style={{ background: loading ? '#94a3b8' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer', marginTop: '4px' }}>
+<<<<<<< HEAD
               {loading ? 'Signing in...' : `Sign In as ${roles.find(r => r.id === selectedRole)?.label} →`}
+=======
+              {loading ? '⏳ Signing in...' : `Sign In as ${roles.find(r => r.id === selectedRole)?.label} →`}
+>>>>>>> a1ebcb0 (Connect frontend to backend - Register and Login with PostgreSQL)
             </button>
           </form>
 
-          {/* Info box for Coordinator/Volunteer */}
           {(selectedRole === 'coordinator' || selectedRole === 'volunteer') && (
             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '12px', marginTop: '16px', textAlign: 'center' }}>
               <p style={{ color: '#a16207', fontSize: '12px' }}>
