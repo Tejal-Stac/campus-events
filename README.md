@@ -66,14 +66,13 @@ The **Campus Event Management System** empowers educational institutions to mana
 ### Backend
 - **Node.js** - JavaScript runtime
 - **Express.js** - RESTful API framework
-- **PostgreSQL (Neon Cloud)** - Cloud-hosted database with SSL
+- **PostgreSQL (Local)** - Relational database system
 - **JWT** - Stateless authentication tokens
 - **bcryptjs** - Password hashing
 - **CORS** - Cross-origin resource sharing
 
 ### Database
-- **Neon PostgreSQL** - Serverless PostgreSQL with automatic scaling
-- **SSL/TLS encryption** for secure connections
+- **PostgreSQL** - Local or cloud-hosted PostgreSQL database
 - **Transaction support** for atomic operations
 - **Indexed queries** for optimal performance
 
@@ -84,7 +83,7 @@ The **Campus Event Management System** empowers educational institutions to mana
 ### Prerequisites
 - **Node.js** v16 or higher ([Download](https://nodejs.org/))
 - **npm** (comes with Node.js) or **yarn**
-- **PostgreSQL database** (Neon Cloud recommended, or local PostgreSQL)
+- **PostgreSQL** installed locally ([Download](https://www.postgresql.org/download/))
 - **Git** for version control
 
 ### 1️⃣ Clone the Repository
@@ -125,36 +124,25 @@ npm install
 
 ## 🗄️ Database Setup
 
-### Option 1: Neon Cloud PostgreSQL (Recommended)
-
-1. **Create a Neon Account**: [https://neon.tech](https://neon.tech)
-2. **Create a New Project** and note your connection details
-3. **Open SQL Editor** in Neon dashboard
-4. **Copy and execute** `backend/schema.sql` to create tables and sample data
-5. **Update `backend/.env`** with your Neon credentials:
-
-```env
-DB_HOST=ep-xxx-yyy-zzz.us-east-2.aws.neon.tech
-DB_PORT=5432
-DB_NAME=neondb
-DB_USER=neondb_owner
-DB_PASSWORD=your_neon_password
-JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
-PORT=5000
-```
-
-### Option 2: Local PostgreSQL
+### Local PostgreSQL (Recommended for Development)
 
 1. **Install PostgreSQL**: [https://www.postgresql.org/download/](https://www.postgresql.org/download/)
+
 2. **Create a database**:
    ```sql
    CREATE DATABASE campus_events;
    ```
-3. **Execute schema**:
+
+3. **Execute schema** to create tables:
    ```bash
+   # Windows (PowerShell)
+   psql -U postgres -d campus_events -f backend/schema.sql
+   
+   # Linux/Mac
    psql -U postgres -d campus_events -f backend/schema.sql
    ```
-4. **Update `backend/.env`**:
+
+4. **Update `backend/.env`** with your local credentials:
    ```env
    DB_HOST=localhost
    DB_PORT=5432
@@ -165,19 +153,39 @@ PORT=5000
    PORT=5000
    ```
 
+### Cloud PostgreSQL (Optional for Production)
+
+If deploying to production, you can use cloud providers like:
+- **Render** - Free PostgreSQL with 90-day retention
+- **Railway** - Easy PostgreSQL deployment
+- **Supabase** - PostgreSQL with additional features
+- **Neon** - Serverless PostgreSQL
+
+Update your `.env` with cloud credentials:
+```env
+DB_HOST=your-cloud-host.com
+DB_PORT=5432
+DB_NAME=campus_events
+DB_USER=your_username
+DB_PASSWORD=your_password
+JWT_SECRET=your_super_secret_jwt_key
+PORT=5000
+```
+
 ### 📊 Database Tables
 
 The schema creates three core tables:
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| **users** | Store user accounts | id, name, email, password (hashed), role, points, branch, year |
+| **users** | Store user accounts with role-based fields | id, first_name, last_name, email, password (hashed), role, gr_number, department, division, year, designation |
 | **events** | Store event details | id, title, description, date, location, category, max_participants, registered_count |
 | **registrations** | Track user-event relationships | id, user_id, event_id, status, attended, certificate_issued |
 
 #### Sample Data Included
 - ✅ Admin account (admin@vit.edu)
 - ✅ Coordinator account (rahul@vit.edu)
+- ✅ Student account (tejal@vit.edu / password: `password123`)
 - ✅ Student account (tejal@vit.edu / password: `password123`)
 - ✅ 3 sample events (Hackathon, Tech Talk, Cultural Fest)
 - ✅ Sample registrations
@@ -224,7 +232,7 @@ npm run dev
 campus-events/
 ├── backend/                    # Express.js API server
 │   ├── config/
-│   │   └── db.js              # PostgreSQL connection with SSL
+│   │   └── db.js              # PostgreSQL connection configuration
 │   ├── controllers/
 │   │   ├── authController.js  # Login, register, JWT validation
 │   │   └── eventController.js # Event CRUD, registration logic
@@ -455,7 +463,7 @@ Authorization: Bearer <jwt_token>
 - ✅ `.env.example` provided for reference (no actual credentials)
 - ✅ JWT secrets use strong random strings in production
 - ✅ Passwords hashed with bcrypt (salt rounds: 10)
-- ✅ SSL/TLS enabled for Neon Cloud connections
+- ✅ Role-based authentication with GR Number (Students) and Employee ID (Faculty)
 - ✅ CORS configured for specific origins in production
 - ✅ SQL injection prevented with parameterized queries
 - ✅ JWT verification middleware on protected routes
@@ -469,8 +477,8 @@ Authorization: Bearer <jwt_token>
 
 2. **Database**:
    - Use connection pooling for scalability
-   - Enable SSL certificate validation in production
    - Regular backups of PostgreSQL data
+   - Enable secure connections for cloud databases
 
 3. **Frontend**:
    - Update `VITE_API_URL` to production backend URL
@@ -592,7 +600,7 @@ git check-ignore -v backend/.env
 - ✅ CORS configured for production origins
 
 #### Database
-- ✅ Neon Cloud PostgreSQL with SSL
+- ✅ Local PostgreSQL with proper configuration
 - ✅ Schema includes indexes for performance
 - ✅ Transactions for atomic operations
 - ✅ Timestamps for audit trails
