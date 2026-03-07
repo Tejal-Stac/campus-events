@@ -7,21 +7,15 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-<<<<<<< HEAD
-// Request logging middleware
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
+  next()
+})
 
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/events', require('./routes/events'));
-app.use('/api/users', require('./routes/users'));
-=======
 app.use('/api/auth', require('./routes/auth'))
 app.use('/api/events', require('./routes/events'))
 app.use('/api/users', require('./routes/users'))
->>>>>>> a1ebcb0 (Connect frontend to backend - Register and Login with PostgreSQL)
+app.use('/api/certificates', require('./routes/certificates'))
 
 app.get('/', (req, res) => {
   res.json({ message: 'Campus Events Backend is running!' })

@@ -1,5 +1,5 @@
-const { Pool } = require('pg');
-require('dotenv').config();
+const { Pool } = require('pg')
+require('dotenv').config()
 
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -7,20 +7,14 @@ const pool = new Pool({
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  ssl: {
-    rejectUnauthorized: false, // Required for Neon/AWS/Supabase connections
-  },
-});
+})
 
-// Test connection with a simple query
-pool.query('SELECT NOW()', (err, res) => {
+pool.connect((err) => {
   if (err) {
-    console.error('Database connection error:', err.message);
-    console.error('Please check your .env variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT)');
+    console.error('Database connection failed:', err.message)
   } else {
-    console.log('✅ Successfully connected to the Neon Cloud Database.');
-    console.log(`Timestamp: ${res.rows[0].now}`);
+    console.log('Connected to PostgreSQL database!')
   }
-});
+})
 
-module.exports = pool;
+module.exports = pool

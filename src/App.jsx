@@ -16,7 +16,6 @@ import FacultyDashboard from './pages/FacultyDashboard'
 import VolunteerDashboard from './pages/VolunteerDashboard'
 import DeanDashboard from './pages/DeanDashboard'
 
-// Smart Home Route: Redirect logged-in users to dashboard
 function SmartHomeRoute() {
   const { user, loading } = useAuth()
   
@@ -29,7 +28,6 @@ function SmartHomeRoute() {
     )
   }
   
-  // Auto-redirect: If logged in, go to dashboard
   if (user) {
     return <Navigate to="/dashboard" replace />
   }
@@ -41,24 +39,18 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        {/* Global Navbar - appears on all pages except login/register */}
         <Navbar />
         
         <Routes>
-          {/* Public Routes */}
+          {/* Public Routes - No login needed */}
           <Route path="/" element={<SmartHomeRoute />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          
+          <Route path="/certificates" element={<Certificates />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/team-building" element={<TeamBuilding />} />
+
           {/* Protected Routes - Require Authentication */}
-          <Route 
-            path="/events" 
-            element={
-              <ProtectedRoute>
-                <Events />
-              </ProtectedRoute>
-            } 
-          />
           <Route 
             path="/dashboard" 
             element={
@@ -68,10 +60,10 @@ function App() {
             } 
           />
           <Route 
-            path="/coord-dashboard" 
+            path="/faculty" 
             element={
-              <ProtectedRoute allowedRoles={['coordinator', 'club_head']}>
-                <CoordinatorDashboard />
+              <ProtectedRoute allowedRoles={['faculty']}>
+                <FacultyDashboard />
               </ProtectedRoute>
             } 
           />
@@ -84,14 +76,6 @@ function App() {
             } 
           />
           <Route 
-            path="/dean-dashboard" 
-            element={
-              <ProtectedRoute allowedRoles={['dean']}>
-                <DeanDashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
             path="/coordinator" 
             element={
               <ProtectedRoute allowedRoles={['club_head', 'coordinator']}>
@@ -100,10 +84,18 @@ function App() {
             } 
           />
           <Route 
-            path="/faculty" 
+            path="/coord-dashboard" 
             element={
-              <ProtectedRoute allowedRoles={['faculty']}>
-                <FacultyDashboard />
+              <ProtectedRoute allowedRoles={['coordinator', 'club_head']}>
+                <CoordinatorDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/volunteer" 
+            element={
+              <ProtectedRoute>
+                <VolunteerDashboard />
               </ProtectedRoute>
             } 
           />
@@ -124,18 +116,10 @@ function App() {
             } 
           />
           <Route 
-            path="/volunteer" 
+            path="/dean-dashboard" 
             element={
-              <ProtectedRoute>
-                <VolunteerDashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/certificates" 
-            element={
-              <ProtectedRoute>
-                <Certificates />
+              <ProtectedRoute allowedRoles={['dean']}>
+                <DeanDashboard />
               </ProtectedRoute>
             } 
           />
@@ -144,14 +128,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <Profile />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/team-building" 
-            element={
-              <ProtectedRoute>
-                <TeamBuilding />
               </ProtectedRoute>
             } 
           />
