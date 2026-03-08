@@ -1,156 +1,107 @@
--- Campus Events Database Schema
--- PostgreSQL Schema for VIT Pune Campus Events System
-
--- Enable UUID extension (optional, if using UUIDs)
--- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Drop existing tables (for clean setup)
-DROP TABLE IF EXISTS registrations CASCADE;
-DROP TABLE IF EXISTS events CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-
--- Users Table
-CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  role VARCHAR(50) DEFAULT 'student', -- student, club_head, coordinator, dean, admin
-  points INTEGER DEFAULT 0, -- Points earned from events
-  branch VARCHAR(100), -- CSE, IT, MECH, etc.
-  year VARCHAR(20), -- 1st, 2nd, 3rd, 4th
-  roll_no VARCHAR(50),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Events Table
-CREATE TABLE events (
-  id SERIAL PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  date TIMESTAMP NOT NULL,
-  location VARCHAR(255),
-  venue VARCHAR(255),
-  category VARCHAR(100), -- Hackathon, Seminar, Workshop, Cultural, Sports, etc.
-  max_participants INTEGER DEFAULT 100,
-  registered_count INTEGER DEFAULT 0,
-  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  organizing_club VARCHAR(255),
-  sa_vertical VARCHAR(100), -- Technical, Cultural, Sports, etc.
-  fees VARCHAR(50) DEFAULT 'Free',
-  contact VARCHAR(50),
-  online_link TEXT,
-  status VARCHAR(50) DEFAULT 'Active', -- Active, Completed, Cancelled, Pending
-  tags TEXT[], -- Array of tags
-  key_features TEXT[], -- Array of key features
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Registrations Table (User-Event relationship)
-CREATE TABLE registrations (
-  id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  status VARCHAR(50) DEFAULT 'confirmed', -- confirmed, waitlisted, cancelled
-  attended BOOLEAN DEFAULT FALSE,
-  certificate_issued BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id, event_id) -- Prevent duplicate registrations
-);
-
--- Indexes for better query performance
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_events_date ON events(date);
-CREATE INDEX idx_events_category ON events(category);
-CREATE INDEX idx_events_created_by ON events(created_by);
-CREATE INDEX idx_registrations_user_id ON registrations(user_id);
-CREATE INDEX idx_registrations_event_id ON registrations(event_id);
-
--- Trigger to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+-- 1. Create Helper Function
+CREATE OR REPLACE FUNCTION public.update_updated_at_column() 
+RETURNS trigger AS $$
 BEGIN
   NEW.updated_at = CURRENT_TIMESTAMP;
   RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- 2. Create Users Table
+CREATE TABLE public.users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'student' CHECK (role IN ('student', 'faculty', 'dean', 'coordinator', 'volunteer', 'admin')),
+    points INTEGER DEFAULT 0,
+    branch VARCHAR(100),
+    year VARCHAR(20),
+    roll_no VARCHAR(50),
+    first_name VARCHAR(255),
+    last_name VARCHAR(255),
+    gr_number VARCHAR(50),
+    designation VARCHAR(100),
+    department VARCHAR(100),
+    division VARCHAR(50),
+    campus VARCHAR(100),
+    phone VARCHAR(20),
+    interests JSONB,
+    assigned_role VARCHAR(50),
+    promoted_by INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+    promotion_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    bio TEXT,
+    profile_pic_url TEXT,
+    organising_club VARCHAR(255),
+    assigned_event_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- 3. Create Events Table
+CREATE TABLE public.events (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    date TIMESTAMP NOT NULL,
+    location VARCHAR(255),
+    venue VARCHAR(255),
+    category VARCHAR(100),
+    max_participants INTEGER DEFAULT 100,
+    registered_count INTEGER DEFAULT 0,
+    created_by INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+    organising_club VARCHAR(255),
+    sa_vertical VARCHAR(100),
+    fees VARCHAR(50) DEFAULT 'Free',
+    contact VARCHAR(50),
+    contact_no VARCHAR(20),
+    online_link TEXT,
+    status VARCHAR(50) DEFAULT 'Active',
+    tags TEXT[],
+    key_features TEXT,
+    campus VARCHAR(100),
+    event_type VARCHAR(100),
+    day VARCHAR(20),
+    capacity INTEGER DEFAULT 100,
+    current_registrations INTEGER DEFAULT 0,
+    time_from TIME,
+    time_to TIME,
+    target_audience VARCHAR(255),
+    department VARCHAR(100),
+    image_url TEXT,
+    expected_count INTEGER,
+    total_seats INTEGER,
+    seats INTEGER,
+    volunteer_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- Insert sample data
-INSERT INTO users (name, email, password, role, branch, year, roll_no, points)
-VALUES 
-  ('Tejal Jadhav', 'tejal@vit.edu', '$2a$10$example.hash', 'student', 'BTech-Computer Engineering', '3rd Year', 'VIT2023CSE045', 1240),
-  ('Rahul Coordinator', 'rahul@vit.edu', '$2a$10$example.hash', 'coordinator', 'CSE Department', 'Faculty', 'FAC001', 0),
-  ('Admin User', 'admin@vit.edu', '$2a$10$example.hash', 'admin', 'All', 'Admin', 'ADMIN001', 0);
+-- 4. Create Registrations Table
+CREATE TABLE public.registrations (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    event_id INTEGER NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+    status VARCHAR(50) DEFAULT 'confirmed',
+    attended BOOLEAN DEFAULT false,
+    certificate_issued BOOLEAN DEFAULT false,
+    registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, event_id)
+);
 
-INSERT INTO events (title, description, date, location, category, max_participants, registered_count, created_by, organizing_club, sa_vertical, fees, contact, tags, key_features)
-VALUES 
-  (
-    'National Hackathon 2025',
-    'A 24-hour coding marathon with industry mentors and exciting prizes.',
-    '2025-03-15 09:00:00',
-    'Main Auditorium',
-    'Hackathon',
-    120,
-    89,
-    2,
-    'CSE Department',
-    'Technical',
-    'Free',
-    '9876543210',
-    ARRAY['coding', 'technology', 'competition'],
-    ARRAY['24 Hour Coding', 'Cash Prizes', 'Industry Mentors']
-  ),
-  (
-    'Tech Talk: AI & Future',
-    'Industry experts discussing the future of AI and machine learning.',
-    '2025-04-02 11:00:00',
-    'Seminar Hall A',
-    'Seminar',
-    80,
-    67,
-    2,
-    'CSE Department',
-    'Technical',
-    'Free',
-    '9876543211',
-    ARRAY['ai', 'machine learning', 'technology'],
-    ARRAY['Industry Experts', 'Q&A Session', 'Certificate']
-  ),
-  (
-    'Cultural Fest 2025',
-    'Annual cultural festival featuring dance, music, drama, and food stalls.',
-    '2025-04-20 10:00:00',
-    'Open Air Theatre',
-    'Cultural',
-    400,
-    310,
-    2,
-    'Cultural Club',
-    'Cultural',
-    '₹50',
-    '9876543213',
-    ARRAY['cultural', 'entertainment', 'festival'],
-    ARRAY['Dance', 'Music', 'Drama', 'Food Stalls']
-  );
+-- 5. Create Performance Indexes
+CREATE INDEX idx_users_email ON public.users(email);
+CREATE INDEX idx_users_role ON public.users(role);
+CREATE INDEX idx_events_category ON public.events(category);
+CREATE INDEX idx_events_date ON public.events(date);
+CREATE INDEX idx_registrations_user_id ON public.registrations(user_id);
+CREATE INDEX idx_registrations_event_id ON public.registrations(event_id);
 
--- Sample registrations
-INSERT INTO registrations (user_id, event_id, status)
-VALUES 
-  (1, 1, 'confirmed'),
-  (1, 2, 'confirmed');
+-- 6. Apply Auto-Update Triggers
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON public.events FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
--- Verify data
-SELECT 'Users count:' as info, COUNT(*) as count FROM users
-UNION ALL
-SELECT 'Events count:', COUNT(*) FROM events
-UNION ALL
-SELECT 'Registrations count:', COUNT(*) FROM registrations;
+-- Update the event to match Tejal's (ID: 9) club name exactly
+UPDATE events 
+SET organising_club = (SELECT organising_club FROM users WHERE id = 9)
+WHERE title = 'AI Summit 2026';

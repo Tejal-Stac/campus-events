@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 
-const departments = ['Computer Engineering', 'IT', 'Mechanical', 'Civil', 'ENTC', 'MBA', 'MCA']
-const divisions = ['A', 'B', 'C', 'D']
+const departments = ['Computer Engineering', 'IT', 'Mechanical', 'Civil', 'ENTC', 'Chemical Engineering', 'AI-ML']
+const divisions = ['A', 'B', 'C', 'D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
 const interests = ['Hackathons', 'Cultural', 'Sports', 'Seminars', 'Workshops', 'Networking', 'Photography', 'Music', 'Dance', 'Robotics']
 const campuses = ['Kondhwa', 'Bibwewadi']
 

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <row>
+    <gr_number>12345678</gr_number>
+    <first_name>Sujal</first_name>
+    <last_name>Patil</last_name>
+    <email>sujal.patil@vit.edu</email>
+    <role>student</role>
+    <department>Computer Engineering</department>
+  </row>
+
+  <row>
+    <gr_number>87654321</gr_number>
+    <first_name>Tejal</first_name>
+    <last_name>Stac</last_name>
+    <email>tejal1@vit.edu</email>
+    <role>coordinator</role>
+    <organising_club>GDSC VIT</organising_club>
+    <department>IT</department>
+  </row>
+
+  <row>
+    <gr_number>FAC001</gr_number>
+    <first_name>Amit</first_name>
+    <last_name>Verma</last_name>
+    <email>v.a@vit.edu</email>
+    <role>faculty</role>
+    <department>Instrumentation</department>
+  </row>
+</root>

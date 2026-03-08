@@ -57,6 +57,19 @@ export const userService = {
       throw error;
     }
   },
+
+  /**
+   * Update user role (Coordinator can appoint/remove volunteers)
+   */
+  async updateUserRole(userId, role, eventId = null) {
+    try {
+      const response = await api.put('/users/update-role', { userId, role, eventId });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      throw error;
+    }
+  },
 };
 
 export default userService;

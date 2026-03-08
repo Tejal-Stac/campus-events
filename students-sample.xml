@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<students>
+  <student>
+    <first_name>Rajesh</first_name>
+    <last_name>Kumar</last_name>
+    <email>rajesh.kumar@vit.edu</email>
+    <password>password123</password>
+    <department>CSE</department>
+    <gr_number>21CSE001</gr_number>
+    <role>student</role>
+  </student>
+  <student>
+    <first_name>Priya</first_name>
+    <last_name>Sharma</last_name>
+    <email>priya.sharma@vit.edu</email>
+    <password>password123</password>
+    <department>IT</department>
+    <gr_number>21IT045</gr_number>
+    <role>student</role>
+  </student>
+  <student>
+    <first_name>Amit</first_name>
+    <last_name>Patel</last_name>
+    <email>amit.patel@vit.edu</email>
+    <password>password123</password>
+    <department>ENTC</department>
+    <gr_number>21ENTC023</gr_number>
+    <role>student</role>
+  </student>
+</students>

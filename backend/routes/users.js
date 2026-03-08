@@ -17,7 +17,7 @@ router.get('/profile', auth, async (req, res) => {
     const result = await pool.query(
       `SELECT u1.id, u1.first_name, u1.last_name, u1.email, u1.role, u1.assigned_role, 
               u1.department, u1.division, u1.year, u1.gr_number, u1.campus, u1.phone, 
-              u1.designation, u1.interests, u1.created_at,
+              u1.designation, u1.interests, u1.organising_club, u1.assigned_event_id, u1.created_at,
               (u2.first_name || ' ' || u2.last_name) AS promoted_by_name
        FROM users u1
        LEFT JOIN users u2 ON u1.promoted_by = u2.id
@@ -47,6 +47,8 @@ router.get('/profile', auth, async (req, res) => {
       phone: user.phone,
       designation: user.designation,
       interests: user.interests,
+      organisingClub: user.organising_club,
+      assignedEventId: user.assigned_event_id,
       promotedByName: user.promoted_by_name,
       points: 0, // TODO: Calculate from events/activities
       createdAt: user.created_at
@@ -189,6 +191,56 @@ router.get('/', auth, async (req, res) => {
   }
 })
 
+// Update user role (Coordinator can upgrade students to volunteers)
+router.put('/update-role', auth, async (req, res) => {
+  const { userId, role, eventId } = req.body
+
+  // Validate role
+  if (!['volunteer', 'student'].includes(role)) {
+    return res.status(400).json({ 
+      success: false,
+      message: 'Invalid role. Can only set volunteer or student.' 
+    })
+  }
+
+  try {
+    // Check if user exists
+    const userCheck = await pool.query(
+      'SELECT id, role, first_name, last_name FROM users WHERE id = $1',
+      [userId]
+    )
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    // Update assigned_role and optionally assigned_event_id
+    const updateQuery = eventId 
+      ? 'UPDATE users SET assigned_role = $1, assigned_event_id = $2 WHERE id = $3 RETURNING *'
+      : 'UPDATE users SET assigned_role = $1, assigned_event_id = NULL WHERE id = $2 RETURNING *'
+    
+    const params = eventId ? [role, eventId, userId] : [role, userId]
+    const result = await pool.query(updateQuery, params)
+
+    const updatedUser = result.rows[0]
+    console.log(`✅ User ${updatedUser.first_name} role updated to ${role} by coordinator ${req.user.email}`)
+
+    res.json({
+      success: true,
+      message: `${updatedUser.first_name} ${updatedUser.last_name} is now a ${role}!`,
+      data: {
+        id: updatedUser.id,
+        firstName: updatedUser.first_name,
+        lastName: updatedUser.last_name,
+        role: updatedUser.assigned_role || updatedUser.role
+      }
+    })
+  } catch (err) {
+    console.error('UPDATE ROLE ERROR:', err.message)
+    res.status(500).json({ success: false, message: 'Server error', error: err.message })
+  }
+})
+
 // Assign role to user (admin access)
 router.put('/:id/assign-role', auth, async (req, res) => {
   const { assignedRole } = req.body
@@ -197,10 +249,7 @@ router.put('/:id/assign-role', auth, async (req, res) => {
       'UPDATE users SET assigned_role = $1 WHERE id = $2 RETURNING *',
       [assignedRole, req.params.id]
     )
-    res.json({
-      message: 'User assigned as ' + assignedRole + '!',
-      user: result.rows[0]
-    })
+    res.json({ message: 'User assigned as ' + assignedRole + '!', user: result.rows[0] })
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message })
   }
@@ -216,6 +265,21 @@ router.put('/:id/remove-role', auth, async (req, res) => {
     res.json({ message: 'Role removed!', user: result.rows[0] })
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message })
+  }
+})
+// PUT /api/users/:id - Update user profile
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const { first_name, last_name, phone, department, year, bio, interests } = req.body
+    const result = await pool.query(
+      `UPDATE users SET first_name=$1, last_name=$2, phone=$3, department=$4, year=$5, bio=$6, interests=$7 WHERE id=$8 RETURNING *`,
+      [first_name, last_name, phone, department, year, bio, JSON.stringify(interests || []), req.params.id]
+    )
+    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' })
+    res.json({ message: 'Profile updated', user: result.rows[0] })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Server error' })
   }
 })
 

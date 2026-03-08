@@ -120,6 +120,7 @@ const login = async (req, res) => {
   }
 }
 
+
 // Get current user's profile (full data)
 const getProfile = async (req, res) => {
   try {

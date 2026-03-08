@@ -15,6 +15,10 @@ export default function FacultyDashboard() {
   const [myEvents, setMyEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingEvent, setEditingEvent] = useState(null)
+  const [showApplicantsModal, setShowApplicantsModal] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [applicants, setApplicants] = useState([])
+  const [loadingApplicants, setLoadingApplicants] = useState(false)
   const [newEvent, setNewEvent] = useState({
     title: '',
     organisingClub: '',
@@ -206,6 +210,31 @@ export default function FacultyDashboard() {
       console.error('Error saving event:', err)
       alert('Failed to save event: ' + (err.response?.data?.message || err.message))
     }
+  }
+
+  // Fetch applicants for an event
+  const handleViewApplicants = async (event) => {
+    setSelectedEvent(event)
+    setShowApplicantsModal(true)
+    setLoadingApplicants(true)
+    setApplicants([])
+    
+    try {
+      const response = await eventService.getEventRegistrations(event.id)
+      setApplicants(response || [])
+    } catch (err) {
+      console.error('Error fetching applicants:', err)
+      alert('Failed to load applicants: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setLoadingApplicants(false)
+    }
+  }
+
+  // Close applicants modal
+  const closeApplicantsModal = () => {
+    setShowApplicantsModal(false)
+    setSelectedEvent(null)
+    setApplicants([])
   }
 
   const inputStyle = {
@@ -512,22 +541,28 @@ export default function FacultyDashboard() {
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button 
                           onClick={() => handleEditEvent(e)}
-                          style={{ flex: 1, background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
+                          style={{ flex: 1, minWidth: '70px', background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
                         >
                           ✏️ Edit
                         </button>
                         <button 
+                          onClick={() => handleViewApplicants(e)}
+                          style={{ flex: 1, minWidth: '70px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
+                        >
+                          👥 Applicants
+                        </button>
+                        <button 
                           onClick={() => downloadReportCSV(e)}
-                          style={{ flex: 1, background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
+                          style={{ flex: 1, minWidth: '70px', background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
                         >
                           📊 CSV
                         </button>
                         <button 
                           onClick={() => downloadReportPDF(e)}
-                          style={{ flex: 1, background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
+                          style={{ flex: 1, minWidth: '70px', background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
                         >
                           📜 PDF
                         </button>
@@ -773,6 +808,204 @@ export default function FacultyDashboard() {
         )}
 
       </div>
+
+      {/* Applicants Modal */}
+      {showApplicantsModal && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+            zIndex: 1000, padding: '20px'
+          }}
+          onClick={closeApplicantsModal}
+        >
+          <div 
+            style={{ 
+              background: '#fff', borderRadius: '16px', maxWidth: '900px', width: '100%', 
+              maxHeight: '80vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ 
+              background: 'linear-gradient(135deg, #1a3a6b, #2563eb)', 
+              padding: '24px', borderRadius: '16px 16px 0 0',
+              position: 'sticky', top: 0, zIndex: 10
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 style={{ color: '#fff', fontWeight: '700', fontSize: '20px', marginBottom: '4px' }}>
+                    👥 Event Applicants
+                  </h2>
+                  <p style={{ color: '#bfdbfe', fontSize: '13px' }}>
+                    {selectedEvent?.title}
+                  </p>
+                </div>
+                <button 
+                  onClick={closeApplicantsModal}
+                  style={{ 
+                    background: 'rgba(255,255,255,0.2)', border: 'none', 
+                    color: '#fff', borderRadius: '8px', width: '32px', height: '32px',
+                    cursor: 'pointer', fontSize: '18px', fontWeight: '700'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              <div style={{ 
+                marginTop: '16px', display: 'flex', gap: '16px', 
+                background: 'rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px'
+              }}>
+                <div>
+                  <p style={{ color: '#bfdbfe', fontSize: '11px' }}>Total Registered</p>
+                  <p style={{ color: '#fff', fontSize: '20px', fontWeight: '700' }}>
+                    {applicants.length}
+                  </p>
+                </div>
+                <div style={{ borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: '16px' }}>
+                  <p style={{ color: '#bfdbfe', fontSize: '11px' }}>Capacity</p>
+                  <p style={{ color: '#fff', fontSize: '20px', fontWeight: '700' }}>
+                    {selectedEvent?.seats || 'N/A'}
+                  </p>
+                </div>
+                <div style={{ borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: '16px' }}>
+                  <p style={{ color: '#bfdbfe', fontSize: '11px' }}>Fill Percentage</p>
+                  <p style={{ color: '#fff', fontSize: '20px', fontWeight: '700' }}>
+                    {selectedEvent?.seats ? Math.round((applicants.length / selectedEvent.seats) * 100) : 0}%
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px' }}>
+              {loadingApplicants ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+                  <p style={{ color: '#64748b', fontSize: '14px' }}>Loading applicants...</p>
+                </div>
+              ) : applicants.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>📝</div>
+                  <p style={{ color: '#1a3a6b', fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
+                    No registrations yet
+                  </p>
+                  <p style={{ color: '#64748b', fontSize: '13px' }}>
+                    Students will appear here once they register for this event
+                  </p>
+                </div>
+              ) : (
+                <div style={{ overflow: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f8faff', borderBottom: '2px solid #dbeafe' }}>
+                        <th style={{ padding: '12px', textAlign: 'left', color: '#1a3a6b', fontSize: '12px', fontWeight: '700' }}>
+                          #
+                        </th>
+                        <th style={{ padding: '12px', textAlign: 'left', color: '#1a3a6b', fontSize: '12px', fontWeight: '700' }}>
+                          Name
+                        </th>
+                        <th style={{ padding: '12px', textAlign: 'left', color: '#1a3a6b', fontSize: '12px', fontWeight: '700' }}>
+                          Email
+                        </th>
+                        <th style={{ padding: '12px', textAlign: 'left', color: '#1a3a6b', fontSize: '12px', fontWeight: '700' }}>
+                          GR Number
+                        </th>
+                        <th style={{ padding: '12px', textAlign: 'left', color: '#1a3a6b', fontSize: '12px', fontWeight: '700' }}>
+                          Department
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {applicants.map((applicant, index) => (
+                        <tr 
+                          key={index}
+                          style={{ 
+                            borderBottom: '1px solid #e5e7eb',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f8faff'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <td style={{ padding: '12px', color: '#64748b', fontSize: '13px' }}>
+                            {index + 1}
+                          </td>
+                          <td style={{ padding: '12px', color: '#1a3a6b', fontSize: '13px', fontWeight: '600' }}>
+                            {applicant.first_name} {applicant.last_name}
+                          </td>
+                          <td style={{ padding: '12px', color: '#64748b', fontSize: '13px' }}>
+                            {applicant.email}
+                          </td>
+                          <td style={{ padding: '12px', color: '#64748b', fontSize: '13px' }}>
+                            {applicant.gr_number || 'N/A'}
+                          </td>
+                          <td style={{ padding: '12px', color: '#64748b', fontSize: '13px' }}>
+                            {applicant.department || 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Modal Footer */}
+              {applicants.length > 0 && (
+                <div style={{ 
+                  marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #e5e7eb',
+                  display: 'flex', justifyContent: 'flex-end', gap: '12px'
+                }}>
+                  <button 
+                    onClick={() => {
+                      const csvContent = [
+                        ['No.', 'First Name', 'Last Name', 'Email', 'GR Number', 'Department', 'Division', 'Campus'],
+                        ...applicants.map((a, i) => [
+                          i + 1,
+                          a.first_name,
+                          a.last_name,
+                          a.email,
+                          a.gr_number || 'N/A',
+                          a.department || 'N/A',
+                          a.division || 'N/A',
+                          a.campus || 'N/A'
+                        ])
+                      ].map(row => row.join(',')).join('\n')
+                      
+                      const blob = new Blob([csvContent], { type: 'text/csv' })
+                      const url = window.URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `${selectedEvent?.title.replace(/[^a-z0-9]/gi, '_')}_applicants.csv`
+                      document.body.appendChild(a)
+                      a.click()
+                      document.body.removeChild(a)
+                      window.URL.revokeObjectURL(url)
+                    }}
+                    style={{ 
+                      background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe',
+                      borderRadius: '8px', padding: '10px 20px', fontSize: '13px', 
+                      fontWeight: '600', cursor: 'pointer'
+                    }}
+                  >
+                    📊 Export CSV
+                  </button>
+                  <button 
+                    onClick={closeApplicantsModal}
+                    style={{ 
+                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', 
+                      border: 'none', borderRadius: '8px', padding: '10px 20px', 
+                      fontSize: '13px', fontWeight: '600', cursor: 'pointer'
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer style={{ background: '#1a3a6b', color: '#93c5fd', textAlign: 'center', padding: '20px', fontSize: '13px', marginTop: '40px' }}>
         © 2025 CampusEvents · Vishwakarma Institute of Technology, Pune

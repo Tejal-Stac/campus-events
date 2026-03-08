@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { deanService } from '../api/deanService'
 import { eventService } from '../api/eventService'
+import axios from 'axios'
 
 export default function DeanDashboard() {
   const { user, logout } = useAuth()
@@ -14,6 +15,9 @@ export default function DeanDashboard() {
   const [campusFilter, setCampusFilter] = useState('All')
   const [assignModal, setAssignModal] = useState(null)
   const [assignRole, setAssignRole] = useState('coordinator')
+  const [uploadFile, setUploadFile] = useState(null)
+  const [uploadType, setUploadType] = useState('students')
+  const [uploadStatus, setUploadStatus] = useState('')
 
   // Fetch data on mount
   useEffect(() => {
@@ -131,6 +135,7 @@ export default function DeanDashboard() {
     { id: 'events', label: '🎫 Event Approvals' },
     { id: 'students', label: '👥 Manage Students' },
     { id: 'assign', label: '🎯 Promote Students' },
+    { id: 'import', label: '📤 Bulk Import' },
     { id: 'reports', label: '📈 Reports' },
   ]
 
@@ -621,6 +626,152 @@ export default function DeanDashboard() {
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Import Tab */}
+        {activeTab === 'import' && (
+          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
+            <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '8px' }}>📤 Bulk Import (XML/Excel)</h2>
+            <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '20px' }}>Upload XML or Excel files to import students or events in bulk</p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              {/* Import Students */}
+              <div style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '20px' }}>
+                <h3 style={{ color: '#1a3a6b', fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>👥 Import Students</h3>
+                <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '16px' }}>Upload XML file with student data (first_name, last_name, email, password, department)</p>
+                <div style={{ marginBottom: '16px' }}>
+                  <input 
+                    type="file" 
+                    accept=".xml,.xlsx,.xls"
+                    onChange={(e) => setUploadFile(e.target.files[0])}
+                    style={{ 
+                      background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', 
+                      padding: '10px', fontSize: '12px', width: '100%', cursor: 'pointer' 
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!uploadFile) { alert('Please select a file'); return; }
+                    const formData = new FormData();
+                    formData.append('file', uploadFile);
+                    setUploadStatus('Uploading students...');
+                    try {
+                      const token = localStorage.getItem('token');
+                      const endpoint = uploadFile.name.endsWith('.xml') ? '/api/import/students/xml' : '/api/import/students';
+                      const res = await axios.post(`http://localhost:5000${endpoint}`, formData, {
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+                      });
+                      setUploadStatus(`✅ Success: ${res.data.imported} imported, ${res.data.skipped} skipped`);
+                      setUploadFile(null);
+                      fetchDashboardData();
+                    } catch (err) {
+                      setUploadStatus(`❌ Error: ${err.response?.data?.message || err.message}`);
+                    }
+                  }}
+                  style={{ 
+                    background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: '8px', 
+                    padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', width: '100%' 
+                  }}
+                >
+                  📤 Upload Students
+                </button>
+              </div>
+
+              {/* Import Events */}
+              <div style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '20px' }}>
+                <h3 style={{ color: '#1a3a6b', fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>📅 Import Events</h3>
+                <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '16px' }}>Upload XML file with event data (title, date, venue, organising_club, target_audience, etc.)</p>
+                <div style={{ marginBottom: '16px' }}>
+                  <input 
+                    type="file" 
+                    accept=".xml,.xlsx,.xls"
+                    onChange={(e) => setUploadFile(e.target.files[0])}
+                    style={{ 
+                      background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', 
+                      padding: '10px', fontSize: '12px', width: '100%', cursor: 'pointer' 
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!uploadFile) { alert('Please select a file'); return; }
+                    const formData = new FormData();
+                    formData.append('file', uploadFile);
+                    setUploadStatus('Uploading events...');
+                    try {
+                      const token = localStorage.getItem('token');
+                      const endpoint = uploadFile.name.endsWith('.xml') ? '/api/import/events/xml' : '/api/import/events';
+                      const res = await axios.post(`http://localhost:5000${endpoint}`, formData, {
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+                      });
+                      setUploadStatus(`✅ Success: ${res.data.imported} imported, ${res.data.skipped} skipped`);
+                      setUploadFile(null);
+                      fetchDashboardData();
+                    } catch (err) {
+                      setUploadStatus(`❌ Error: ${err.response?.data?.message || err.message}`);
+                    }
+                  }}
+                  style={{ 
+                    background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', 
+                    padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', width: '100%' 
+                  }}
+                >
+                  📤 Upload Events
+                </button>
+              </div>
+            </div>
+
+            {/* Upload Status */}
+            {uploadStatus && (
+              <div style={{ 
+                marginTop: '20px', padding: '16px', borderRadius: '10px',
+                background: uploadStatus.startsWith('✅') ? '#f0fdf4' : uploadStatus.startsWith('❌') ? '#fef2f2' : '#fffbeb',
+                border: `1px solid ${uploadStatus.startsWith('✅') ? '#bbf7d0' : uploadStatus.startsWith('❌') ? '#fecaca' : '#fde68a'}`,
+                color: '#1a3a6b', fontSize: '13px', fontWeight: '600'
+              }}>
+                {uploadStatus}
+              </div>
+            )}
+
+            {/* XML Format Guide */}
+            <div style={{ marginTop: '24px', background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '20px' }}>
+              <h3 style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>📋 XML Format Examples</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <p style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Students XML:</p>
+                  <pre style={{ 
+                    background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', 
+                    padding: '12px', fontSize: '11px', color: '#64748b', overflowX: 'auto' 
+                  }}>{`<students>
+  <student>
+    <first_name>John</first_name>
+    <last_name>Doe</last_name>
+    <email>john@vit.edu</email>
+    <password>password123</password>
+    <department>CSE</department>
+  </student>
+</students>`}</pre>
+                </div>
+                <div>
+                  <p style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Events XML:</p>
+                  <pre style={{ 
+                    background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', 
+                    padding: '12px', fontSize: '11px', color: '#64748b', overflowX: 'auto' 
+                  }}>{`<events>
+  <event>
+    <title>Hackathon 2025</title>
+    <date>2025-04-15</date>
+    <venue>Auditorium</venue>
+    <organising_club>Tech Club</organising_club>
+    <target_audience>All</target_audience>
+    <seats>100</seats>
+  </event>
+</events>`}</pre>
+                </div>
+              </div>
             </div>
           </div>
         )}

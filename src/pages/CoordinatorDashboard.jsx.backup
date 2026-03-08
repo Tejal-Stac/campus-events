@@ -29,11 +29,13 @@ export default function CoordinatorDashboard() {
         // Fetch all events and filter by coordinator's organising_club
         const eventsData = await eventService.getAllEvents()
         
-        // Filter events by organising_club matching user's club (with typo protection)
+        // Filter events by organising_club matching user's club
         const coordinatorEvents = (eventsData || []).filter(event => {
-          const eventClub = event.organising_club || event.organizing_club
-          const userClub = profileData.organisingClub
-          return eventClub === userClub
+          // Match by organising_club OR created_by
+          const matchByClub = event.organising_club && profileData.organisingClub && 
+                              event.organising_club.toLowerCase() === profileData.organisingClub.toLowerCase()
+          const matchByCreator = event.created_by === profileData.id
+          return matchByClub || matchByCreator
         })
         
         console.log(`📊 Coordinator: ${coordinatorEvents.length} events found for ${profileData.organisingClub || 'user ' + profileData.id}`)

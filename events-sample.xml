@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<events>
+  <event>
+    <title>Tech Summit 2026</title>
+    <organising_club>Computer Society</organising_club>
+    <sa_vertical>Technical</sa_vertical>
+    <date>2026-05-15</date>
+    <day>Friday</day>
+    <time_from>09:00</time_from>
+    <time_to>17:00</time_to>
+    <venue>Main Auditorium</venue>
+    <online_link>https://meet.google.com/abc-defg-hij</online_link>
+    <target_audience>All Students</target_audience>
+    <expected_count>200</expected_count>
+    <seats>150</seats>
+    <fees>Free</fees>
+    <contact>9876543210</contact>
+    <category>Seminar</category>
+    <key_features>Industry Speakers, Networking, Career Guidance</key_features>
+    <description>Annual tech summit featuring industry leaders and emerging technologies</description>
+    <department>CSE</department>
+    <contact_number>9876543210</contact_number>
+  </event>
+  <event>
+    <title>CodeCraft Hackathon</title>
+    <organising_club>Tech Club</organising_club>
+    <sa_vertical>Technical</sa_vertical>
+    <date>2026-06-10</date>
+    <day>Saturday</day>
+    <time_from>08:00</time_from>
+    <time_to>20:00</time_to>
+    <venue>Computer Lab 3</venue>
+    <online_link>https://zoom.us/j/123456789</online_link>
+    <target_audience>CSE & IT Students</target_audience>
+    <expected_count>100</expected_count>
+    <seats>80</seats>
+    <fees>50</fees>
+    <contact>8765432109</contact>
+    <category>Hackathon</category>
+    <key_features>24hr Coding, Prizes, Mentorship</key_features>
+    <description>Build innovative solutions in 12 hours with expert mentorship</description>
+    <department>CSE</department>
+    <contact_number>8765432109</contact_number>
+  </event>
+</events>

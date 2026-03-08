@@ -1,15 +1,7 @@
 import Navbar from '../components/Navbar'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-const certificates = [
-  { id: 1, title: 'National Hackathon 2025', date: 'Mar 15, 2025', role: 'Participant', category: 'Hackathon', issueDate: 'Mar 16, 2025', certId: 'CE-2025-HAC-001', color: '#1d4ed8' },
-  { id: 2, title: 'Cultural Fest – Rhythm', date: 'Oct 5, 2024', role: 'Volunteer', category: 'Cultural', issueDate: 'Oct 6, 2024', certId: 'CE-2024-CUL-089', color: '#db2777' },
-  { id: 3, title: 'ML Workshop', date: 'Sep 20, 2024', role: 'Participant', category: 'Workshop', issueDate: 'Sep 21, 2024', certId: 'CE-2024-WRK-034', color: '#059669' },
-  { id: 4, title: 'CodeSprint 2024', date: 'Nov 10, 2024', role: 'Winner 🏆', category: 'Hackathon', issueDate: 'Nov 11, 2024', certId: 'CE-2024-HAC-012', color: '#d97706' },
-  { id: 5, title: 'Tech Talk: AI & Future', date: 'Apr 2, 2025', role: 'Participant', category: 'Seminar', issueDate: 'Apr 3, 2025', certId: 'CE-2025-SEM-007', color: '#7c3aed' },
-]
-
-function CertificatePreview({ cert, onClose }) {
+function CertificatePreview({ cert, onClose, onDownload, downloading }) {
   return (
     <div onClick={onClose}
       style={{ position: 'fixed', inset: 0, background: 'rgba(26,58,107,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -19,72 +11,162 @@ function CertificatePreview({ cert, onClose }) {
         <button onClick={onClose}
           style={{ position: 'absolute', top: '16px', right: '20px', background: 'transparent', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
 
-        {/* Top */}
         <div style={{ marginBottom: '8px' }}>
           <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎓</div>
           <p style={{ color: '#94a3b8', fontSize: '11px', letterSpacing: '3px', textTransform: 'uppercase' }}>CampusEvents · VIT Pune</p>
         </div>
 
         <h1 style={{ color: '#1a3a6b', fontFamily: 'Georgia, serif', fontSize: '26px', marginBottom: '8px' }}>
-          Certificate of {cert.role.includes('Winner') ? 'Achievement' : cert.role === 'Volunteer' ? 'Appreciation' : 'Participation'}
+          Certificate of Participation
         </h1>
 
         <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '20px' }}>This is to certify that</p>
 
         <h2 style={{ color: cert.color, fontFamily: 'Georgia, serif', fontSize: '34px', marginBottom: '8px', borderBottom: `2px solid ${cert.color}`, display: 'inline-block', paddingBottom: '4px' }}>
-          Tejal Jadhav
+          {cert.studentName}
         </h2>
 
         <p style={{ color: '#475569', fontSize: '14px', margin: '16px 0' }}>
-          has successfully completed the role of <strong style={{ color: '#1a3a6b' }}>{cert.role}</strong> in
+          has successfully participated in
         </p>
 
         <h3 style={{ color: '#1a3a6b', fontFamily: 'Georgia, serif', fontSize: '20px', marginBottom: '8px' }}>{cert.title}</h3>
-        <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '28px' }}>Held on {cert.date}</p>
+        <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '28px' }}>Organised by: {cert.organisingClub}</p>
 
-        {/* Footer */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '28px', paddingTop: '20px', borderTop: '1px solid #e2e8f0' }}>
           <div style={{ textAlign: 'left' }}>
-            <p style={{ color: '#1a3a6b', fontFamily: 'Georgia, serif', fontSize: '15px', borderBottom: '1px solid #1a3a6b', paddingBottom: '4px', marginBottom: '4px' }}>Dr. R. Sharma</p>
-            <p style={{ color: '#64748b', fontSize: '11px' }}>Event Coordinator</p>
+            <p style={{ color: '#1a3a6b', fontFamily: 'Georgia, serif', fontSize: '15px', borderBottom: '1px solid #1a3a6b', paddingBottom: '4px', marginBottom: '4px' }}>Event Coordinator</p>
+            <p style={{ color: '#64748b', fontSize: '11px' }}>VIT Pune</p>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ background: cert.color, borderRadius: '50%', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '800', fontSize: '14px', margin: '0 auto 4px' }}>CE</div>
             <p style={{ color: '#64748b', fontSize: '10px' }}>Official Seal</p>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <p style={{ color: '#64748b', fontSize: '11px' }}>Certificate ID</p>
-            <p style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '700' }}>{cert.certId}</p>
-            <p style={{ color: '#64748b', fontSize: '11px' }}>Issued: {cert.issueDate}</p>
+            <p style={{ color: '#64748b', fontSize: '11px' }}>Dean of Student Affairs</p>
+            <p style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '700' }}>VIT Pune</p>
           </div>
         </div>
 
-        <button onClick={() => alert('Certificate downloaded!')}
-          style={{ marginTop: '24px', background: cert.color, color: '#fff', border: 'none', borderRadius: '10px', padding: '12px 32px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
-          ⬇️ Download Certificate
+        <button onClick={() => onDownload(cert.eventId)}
+          disabled={downloading}
+          style={{ marginTop: '24px', background: downloading ? '#94a3b8' : cert.color, color: '#fff', border: 'none', borderRadius: '10px', padding: '12px 32px', fontSize: '14px', fontWeight: '700', cursor: downloading ? 'not-allowed' : 'pointer' }}>
+          {downloading ? '⏳ Downloading...' : '⬇️ Download Certificate PDF'}
         </button>
       </div>
     </div>
   )
 }
 
+const colors = ['#1d4ed8', '#db2777', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2']
+
+const mockCertificates = [
+  { id: 1, eventId: 1, title: 'National Hackathon 2025', organisingClub: 'IEEE VIT', category: 'Hackathon', color: '#1d4ed8', studentName: 'Your Name' },
+  { id: 2, eventId: 2, title: 'Cultural Fest – Rhythm', organisingClub: 'Cultural Committee', category: 'Cultural', color: '#db2777', studentName: 'Your Name' },
+  { id: 3, eventId: 3, title: 'ML Workshop', organisingClub: 'AI Club', category: 'Workshop', color: '#059669', studentName: 'Your Name' },
+]
+
 export default function Certificates() {
   const [selected, setSelected] = useState(null)
   const [filter, setFilter] = useState('All')
+  const [registeredEvents, setRegisteredEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState('')
 
-  const categories = ['All', 'Hackathon', 'Cultural', 'Workshop', 'Seminar']
-  const filtered = filter === 'All' ? certificates : certificates.filter(c => c.category === filter)
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const token = localStorage.getItem('token')
+
+  useEffect(() => {
+    fetchRegisteredEvents()
+  }, [])
+
+  const fetchRegisteredEvents = async () => {
+    if (!token) {
+      setLoading(false)
+      return
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/events', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const events = await response.json()
+      const approved = events.filter(e => e.status === 'approved')
+      setRegisteredEvents(approved)
+    } catch (err) {
+      setError('Could not load events')
+    }
+    setLoading(false)
+  }
+
+  const downloadCertificate = async (eventId) => {
+    if (!token) {
+      alert('Please login to download certificates!')
+      return
+    }
+    setDownloading(true)
+    try {
+      const response = await fetch(`http://localhost:5000/api/certificates/generate/${eventId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        alert(data.message || 'Could not generate certificate')
+        setDownloading(false)
+        return
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `certificate-${user.firstName || 'student'}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('Download failed! Make sure backend is running.')
+    }
+    setDownloading(false)
+  }
+
+  const displayCerts = token
+    ? registeredEvents.map((e, i) => ({
+        id: e.id,
+        eventId: e.id,
+        title: e.title,
+        organisingClub: e.organising_club || 'VIT Pune',
+        category: e.category || 'Event',
+        color: colors[i % colors.length],
+        studentName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Student'
+      }))
+    : mockCertificates
+
+  const categories = ['All', ...new Set(displayCerts.map(c => c.category))]
+  const filtered = filter === 'All' ? displayCerts : displayCerts.filter(c => c.category === filter)
 
   return (
     <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
       <Navbar />
 
-      {selected && <CertificatePreview cert={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <CertificatePreview
+          cert={selected}
+          onClose={() => setSelected(null)}
+          onDownload={downloadCertificate}
+          downloading={downloading}
+        />
+      )}
 
       {/* Header */}
       <div style={{ background: 'linear-gradient(135deg, #1a3a6b, #2563eb)', paddingTop: '80px', paddingBottom: '40px', textAlign: 'center' }}>
         <h1 style={{ color: '#fff', fontFamily: 'Georgia, serif', fontSize: '36px', fontWeight: '700', marginBottom: '8px' }}>📜 My Certificates</h1>
-        <p style={{ color: '#bfdbfe', fontSize: '15px' }}>All your earned certificates in one place — view and download anytime</p>
+        <p style={{ color: '#bfdbfe', fontSize: '15px' }}>All your earned certificates — view and download anytime</p>
+        {!token && (
+          <p style={{ color: '#fde68a', fontSize: '13px', marginTop: '8px' }}>⚠️ Login to see your real certificates</p>
+        )}
       </div>
 
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px' }}>
@@ -92,9 +174,9 @@ export default function Certificates() {
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
           {[
-            { label: 'Total Earned', value: certificates.length, color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-            { label: 'As Participant', value: certificates.filter(c => c.role === 'Participant').length, color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
-            { label: 'As Volunteer/Winner', value: certificates.filter(c => c.role !== 'Participant').length, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+            { label: 'Total Earned', value: displayCerts.length, color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+            { label: 'Events Attended', value: displayCerts.length, color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
+            { label: 'Downloadable', value: displayCerts.length, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: '16px', textAlign: 'center', padding: '20px' }}>
               <div style={{ color: s.color, fontSize: '32px', fontWeight: '800' }}>{s.value}</div>
@@ -102,6 +184,13 @@ export default function Certificates() {
             </div>
           ))}
         </div>
+
+        {/* Error */}
+        {error && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
+            <p style={{ color: '#dc2626', fontSize: '13px' }}>⚠️ {error}</p>
+          </div>
+        )}
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
@@ -119,44 +208,58 @@ export default function Certificates() {
           ))}
         </div>
 
+        {/* Loading */}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '60px' }}>
+            <div style={{ fontSize: '40px', marginBottom: '16px' }}>⏳</div>
+            <p style={{ color: '#64748b' }}>Loading your certificates...</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px', background: '#fff', borderRadius: '16px', border: '1px solid #dbeafe' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
+            <h3 style={{ color: '#1a3a6b', marginBottom: '8px' }}>No certificates yet!</h3>
+            <p style={{ color: '#64748b', fontSize: '14px' }}>Register for events and participate to earn certificates.</p>
+          </div>
+        )}
+
         {/* Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-          {filtered.map(cert => (
-            <div key={cert.id} onClick={() => setSelected(cert)}
-              style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s' }}
-              onMouseOver={e => { e.currentTarget.style.borderColor = '#1a3a6b'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(26,58,107,0.1)' }}
-              onMouseOut={e => { e.currentTarget.style.borderColor = '#dbeafe'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}>
+        {!loading && filtered.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+            {filtered.map(cert => (
+              <div key={cert.id} onClick={() => setSelected(cert)}
+                style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseOver={e => { e.currentTarget.style.borderColor = '#1a3a6b'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(26,58,107,0.1)' }}
+                onMouseOut={e => { e.currentTarget.style.borderColor = '#dbeafe'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}>
 
-              {/* Banner */}
-              <div style={{ background: `linear-gradient(135deg, ${cert.color}20, ${cert.color}08)`, borderBottom: `3px solid ${cert.color}`, padding: '28px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: '36px', marginBottom: '8px' }}>🎓</div>
-                <p style={{ color: cert.color, fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '6px', fontWeight: '700' }}>
-                  Certificate of {cert.role.includes('Winner') ? 'Achievement' : cert.role === 'Volunteer' ? 'Appreciation' : 'Participation'}
-                </p>
-                <h3 style={{ color: '#1a3a6b', fontFamily: 'Georgia, serif', fontSize: '15px', fontWeight: '700' }}>{cert.title}</h3>
-              </div>
-
-              {/* Body */}
-              <div style={{ padding: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={{ background: cert.color + '15', color: cert.color, borderRadius: '6px', fontSize: '11px', padding: '3px 10px', fontWeight: '600' }}>{cert.role}</span>
-                  <span style={{ color: '#94a3b8', fontSize: '11px' }}>{cert.issueDate}</span>
+                <div style={{ background: `linear-gradient(135deg, ${cert.color}20, ${cert.color}08)`, borderBottom: `3px solid ${cert.color}`, padding: '28px 20px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '36px', marginBottom: '8px' }}>🎓</div>
+                  <p style={{ color: cert.color, fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '6px', fontWeight: '700' }}>
+                    Certificate of Participation
+                  </p>
+                  <h3 style={{ color: '#1a3a6b', fontFamily: 'Georgia, serif', fontSize: '15px', fontWeight: '700' }}>{cert.title}</h3>
                 </div>
-                <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>🪪 {cert.certId}</p>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={e => { e.stopPropagation(); setSelected(cert) }}
-                    style={{ flex: 1, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: 'pointer', fontWeight: '600' }}>
-                    👁️ View
-                  </button>
-                  <button onClick={e => { e.stopPropagation(); alert(`Downloading ${cert.certId}`) }}
-                    style={{ flex: 1, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: 'pointer', fontWeight: '600' }}>
-                    ⬇️ Download
-                  </button>
+
+                <div style={{ padding: '16px' }}>
+                  <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>🏢 {cert.organisingClub}</p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={e => { e.stopPropagation(); setSelected(cert) }}
+                      style={{ flex: 1, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: 'pointer', fontWeight: '600' }}>
+                      👁️ View
+                    </button>
+                    <button onClick={e => { e.stopPropagation(); downloadCertificate(cert.eventId) }}
+                      disabled={downloading}
+                      style={{ flex: 1, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: 'pointer', fontWeight: '600' }}>
+                      ⬇️ Download
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <footer style={{ background: '#1a3a6b', color: '#93c5fd', textAlign: 'center', padding: '20px', fontSize: '13px', marginTop: '40px' }}>

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import eventService from '../api/eventService'
-import api from '../api/axiosConfig'
 
 const categories = ['All', 'Hackathon', 'Cultural', 'Seminar', 'Sports', 'Workshop', 'Networking']
 const branches = ['All', 'CSE', 'IT', 'MECH', 'ENTC', 'MBA', 'MCA']
@@ -81,8 +80,8 @@ export default function Events() {
 
   const handleRegister = async (eventId, eventTitle) => {
     try {
-      await api.post(`/events/register/${eventId}`)
-      alert('🎉 Successfully Registered!')
+      await eventService.registerForEvent(eventId)
+      alert(`✅ Successfully registered for ${eventTitle}!\n\n🎉 100 points added to your profile!`)
       
       // Update user points and registrations in global state
       await updateUserPoints()
@@ -406,7 +405,7 @@ export default function Events() {
                           ? 'bg-green-600 text-white cursor-default border-2 border-green-700'
                           : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:scale-105 hover:shadow-lg active:scale-95'
                       }`}
-                      onClick={() => handleRegister(event.id)}
+                      onClick={() => !pct >= 100 && !isRegistered && handleRegister(event.id, event.title)}
                       disabled={pct >= 100 || isRegistered}>
                       {pct >= 100 ? (
                         <>

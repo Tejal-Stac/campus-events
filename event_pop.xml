@@ -1,0 +1,26 @@
+<events>
+  <event>
+    <title>AI Summit 2026</title>
+    <date>2026-05-10</date>
+    <venue>Seminar Hall A</venue>
+    <organising_club>Tech Club</organising_club>
+    <target_audience>Engineering Students</target_audience>
+    <seats>150</seats>
+  </event>
+  <event>
+    <title>Annual Dance Battle</title>
+    <date>2026-06-15</date>
+    <venue>Open Air Theatre</venue>
+    <organising_club>Cultural Club</organising_club>
+    <target_audience>All</target_audience>
+    <seats>500</seats>
+  </event>
+  <event>
+    <title>RoboRace Competition</title>
+    <date>2026-04-20</date>
+    <venue>Main Ground</venue>
+    <organising_club>Robotics Club</organising_club>
+    <target_audience>Tech Enthusiasts</target_audience>
+    <seats>80</seats>
+  </event>
+</events>

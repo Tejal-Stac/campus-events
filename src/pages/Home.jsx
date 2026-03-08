@@ -19,7 +19,6 @@ const upcomingEvents = [
     fees: 'Free',
     contact: '9876543210',
     category: 'Hackathon',
-    saVertical: 'Technical',
     keyFeatures: ['24 Hour Coding', 'Cash Prizes', 'Industry Mentors'],
   },
   {

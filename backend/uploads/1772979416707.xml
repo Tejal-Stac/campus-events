@@ -1,0 +1,9 @@
+<students>
+  <student>
+    <first_name>Test</first_name>
+    <last_name>User</last_name>
+    <email>test@vit.edu</email>
+    <password>test123</password>
+    <department>CSE</department>
+  </student>
+</students>

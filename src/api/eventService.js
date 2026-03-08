@@ -13,7 +13,7 @@ export const eventService = {
   async getAllEvents() {
     try {
       const response = await api.get('/events');
-      return response.data.data;
+      return response.data;
     } catch (error) {
       console.error('Error fetching all events:', error);
       throw error;
@@ -97,6 +97,32 @@ export const eventService = {
       return response.data.data;
     } catch (error) {
       console.error('Error fetching event registrations:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get coordinator stats (events, registrations, volunteers)
+   */
+  async getCoordinatorStats() {
+    try {
+      const response = await api.get('/events/coordinator/stats');
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching coordinator stats:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get coordinator's volunteers
+   */
+  async getCoordinatorVolunteers() {
+    try {
+      const response = await api.get('/events/coordinator/volunteers');
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching coordinator volunteers:', error);
       throw error;
     }
   },

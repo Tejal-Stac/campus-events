@@ -7,9 +7,18 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
+  next()
+})
+
+// API routes
 app.use('/api/auth', require('./routes/auth'))
 app.use('/api/events', require('./routes/events'))
 app.use('/api/users', require('./routes/users'))
+app.use('/api/certificates', require('./routes/certificates'))
+app.use('/api/import', require('./routes/import'))
 
 app.get('/', (req, res) => {
   res.json({ message: 'Campus Events Backend is running!' })

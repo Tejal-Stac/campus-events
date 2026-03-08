@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { userService } from '../api/userService'
-import { eventService } from '../api/eventService'
+import userService from '../api/userService'
 
 export default function StudentDashboard() {
   const { user } = useAuth()
@@ -81,7 +80,6 @@ export default function StudentDashboard() {
     )
   }
 
-  // Get user initials for avatar
   const getInitials = (name) => {
     if (!name) return 'NA'
     const parts = name.split(' ')
@@ -91,13 +89,11 @@ export default function StudentDashboard() {
     return name.substring(0, 2).toUpperCase()
   }
 
-  // Format date for display
   const formatDate = (dateString) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
-  // Dummy data for features not yet implemented with real data
   const aiSuggestions = [
     { title: 'Robotics Competition', match: '94%', reason: 'Based on your tech event history' },
     { title: 'Industry Connect – CSE', match: '88%', reason: 'Matches your branch & year' },
@@ -109,9 +105,9 @@ export default function StudentDashboard() {
   return (
     <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
 
-      {/* Student Info Bar - VIT Style */}
+      {/* Student Info Bar */}
       <div style={{ background: '#fff', borderBottom: '1px solid #dbeafe', padding: '10px 24px', marginTop: '56px', display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
-        <div className="flex items-center gap-3">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#1a3a6b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '16px' }}>
             {getInitials(student?.name || `${student?.firstName} ${student?.lastName}`)}
           </div>
@@ -119,9 +115,7 @@ export default function StudentDashboard() {
             <p style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '15px' }}>
               {student?.name || `${student?.firstName || ''} ${student?.lastName || ''}`.trim() || 'Student'}
             </p>
-            <div className="flex items-center gap-2">
-              <span style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '20px', fontSize: '11px', padding: '2px 10px', fontWeight: '600' }}>● Active</span>
-            </div>
+            <span style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '20px', fontSize: '11px', padding: '2px 10px', fontWeight: '600' }}>● Active</span>
           </div>
         </div>
         <div style={{ color: '#64748b', fontSize: '13px' }}>Email: <strong style={{ color: '#1a3a6b' }}>{student?.email || 'N/A'}</strong></div>
@@ -135,18 +129,18 @@ export default function StudentDashboard() {
         <p style={{ color: '#64748b', fontSize: '13px' }}>🏠 Home / <span style={{ color: '#1a3a6b', fontWeight: '600' }}>Dashboard</span></p>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
           {[
             { label: 'Events Registered', value: upcomingEvents?.length || 0, icon: '🎯', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
             { label: 'Certificates', value: 0, icon: '📜', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
-            { label: 'Skills Gained', value: 0, icon: '💡', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
+            { label: 'Skills Gained', value: skills.length, icon: '💡', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
             { label: 'Points Earned', value: student?.points || 0, icon: '⭐', bg: '#fdf4ff', color: '#7e22ce', border: '#e9d5ff' },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: '12px', textAlign: 'center', padding: '20px' }}>
-              <div className="text-2xl mb-1">{s.icon}</div>
+              <div style={{ fontSize: '28px', marginBottom: '4px' }}>{s.icon}</div>
               <div style={{ color: s.color, fontSize: '28px', fontWeight: '700' }}>{s.value}</div>
               <div style={{ color: '#64748b', fontSize: '12px' }}>{s.label}</div>
             </div>
@@ -154,24 +148,25 @@ export default function StudentDashboard() {
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
 
           {/* Left Column */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-            {/* Quick Links - VIT Style Tiles */}
+            {/* Quick Links */}
             <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
               <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '16px', fontSize: '16px' }}>⚡ Quick Access</h2>
-              <div className="grid grid-cols-3 gap-4">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                 {[
                   { icon: '📅', label: 'Browse Events', to: '/events', bg: '#eff6ff' },
                   { icon: '📜', label: 'My Certificates', to: '/certificates', bg: '#f0fdf4' },
                   { icon: '👤', label: 'My Profile', to: '/profile', bg: '#fdf4ff' },
-                  { icon: '🤝', label: 'Find Team', to: '/team', bg: '#fff7ed' },
+                  { icon: '🤝', label: 'Find Team', to: '/team-building', bg: '#fff7ed' },
                   { icon: '🏆', label: 'Leaderboard', to: '/dashboard', bg: '#fffbeb' },
                   { icon: '🔔', label: 'Reminders', to: '/dashboard', bg: '#fef2f2' },
                 ].map(q => (
-                  <Link key={q.label} to={q.to} style={{ background: q.bg, border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 12px', textAlign: 'center', textDecoration: 'none', display: 'block', transition: 'all 0.2s' }}
+                  <Link key={q.label} to={q.to}
+                    style={{ background: q.bg, border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 12px', textAlign: 'center', textDecoration: 'none', display: 'block', transition: 'all 0.2s' }}
                     onMouseOver={e => { e.currentTarget.style.borderColor = '#1a3a6b'; e.currentTarget.style.transform = 'translateY(-2px)' }}
                     onMouseOut={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'translateY(0)' }}>
                     <div style={{ fontSize: '28px', marginBottom: '8px' }}>{q.icon}</div>
@@ -183,31 +178,29 @@ export default function StudentDashboard() {
 
             {/* Upcoming Events */}
             <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-              <div className="flex justify-between items-center mb-4">
-                <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px' }}>📅 My Upcoming Events</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px' }}>📅 Upcoming Events</h2>
                 <Link to="/events" style={{ color: '#2563eb', fontSize: '12px', textDecoration: 'none' }}>View all →</Link>
               </div>
               {upcomingEvents?.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
                   <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
-                  <p style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>No upcoming events</p>
-                  <p style={{ fontSize: '12px' }}>Register for events to see them here</p>
+                  <p style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>No approved events yet</p>
+                  <p style={{ fontSize: '12px' }}>Events approved by Dean will appear here</p>
                   <Link to="/events" style={{ display: 'inline-block', marginTop: '16px', background: '#2563eb', color: '#fff', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontSize: '12px' }}>Browse Events</Link>
                 </div>
               ) : (
-                <div className="flex flex-col gap-3">
-                  {upcomingEvents?.map(e => (
-                    <div key={e.event_id} style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '14px' }} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {upcomingEvents.map(e => (
+                    <div key={e.id} style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ background: '#dbeafe', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>🎫</div>
                         <div>
                           <p style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '600' }}>{e.title}</p>
-                          <p style={{ color: '#64748b', fontSize: '12px' }}>{formatDate(e.date)} · {e.category || 'Event'}</p>
+                          <p style={{ color: '#64748b', fontSize: '12px' }}>{e.date ? formatDate(e.date) : 'TBD'} · {e.category || 'Event'}</p>
                         </div>
                       </div>
-                      <span style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '6px', fontSize: '11px', padding: '3px 10px', fontWeight: '600' }}>
-                        Registered
-                      </span>
+                      <span style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '6px', fontSize: '11px', padding: '3px 10px', fontWeight: '600' }}>Approved</span>
                     </div>
                   ))}
                 </div>
@@ -226,18 +219,18 @@ export default function StudentDashboard() {
           </div>
 
           {/* Right Column */}
-          <div className="flex flex-col gap-6">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
             {/* AI Suggestions */}
             <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
               <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px', marginBottom: '4px' }}>🤖 AI Recommendations</h2>
               <p style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '16px' }}>Based on your profile & history</p>
-              <div className="flex flex-col gap-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {aiSuggestions.map(s => (
                   <div key={s.title} style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '12px', cursor: 'pointer' }}
                     onMouseOver={e => e.currentTarget.style.borderColor = '#1a3a6b'}
                     onMouseOut={e => e.currentTarget.style.borderColor = '#dbeafe'}>
-                    <div className="flex justify-between items-start mb-1">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
                       <p style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '600' }}>{s.title}</p>
                       <span style={{ background: '#dbeafe', color: '#1d4ed8', borderRadius: '6px', fontSize: '10px', padding: '2px 6px', flexShrink: 0, marginLeft: '8px', fontWeight: '700' }}>{s.match}</span>
                     </div>
@@ -250,19 +243,21 @@ export default function StudentDashboard() {
             {/* Skills */}
             <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
               <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px', marginBottom: '16px' }}>💡 Skills Gained</h2>
-              <div className="flex flex-wrap gap-2">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 {skills.map(s => (
                   <span key={s} style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '20px', fontSize: '12px', padding: '4px 12px', fontWeight: '500' }}>{s}</span>
                 ))}
               </div>
             </div>
 
-            {/* Search Bar - VIT Style */}
+            {/* Search */}
             <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
               <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px', marginBottom: '12px' }}>🔍 Search Events</h2>
               <div style={{ position: 'relative' }}>
-                <input placeholder="Search Link..." style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 40px 10px 14px', fontSize: '13px', outline: 'none', color: '#1a3a6b', boxSizing: 'border-box' }}
-                  onFocus={e => e.target.style.borderColor = '#1a3a6b'} onBlur={e => e.target.style.borderColor = '#cbd5e1'} />
+                <input placeholder="Search events..."
+                  style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 40px 10px 14px', fontSize: '13px', outline: 'none', color: '#1a3a6b', boxSizing: 'border-box' }}
+                  onFocus={e => e.target.style.borderColor = '#1a3a6b'}
+                  onBlur={e => e.target.style.borderColor = '#cbd5e1'} />
                 <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
               </div>
             </div>
@@ -271,11 +266,9 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* Footer */}
       <div style={{ background: '#1a3a6b', color: '#93c5fd', textAlign: 'center', padding: '16px', fontSize: '12px', marginTop: '32px' }}>
         Powered by <strong style={{ color: '#fff' }}>CampusEvents</strong> · Vishwakarma Institute of Technology, Pune
       </div>
-
     </div>
   )
 }
