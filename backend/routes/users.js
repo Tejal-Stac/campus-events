@@ -38,5 +38,20 @@ router.put('/:id/remove-role', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message })
   }
 })
+// PUT /api/users/:id - Update user profile
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const { first_name, last_name, phone, department, year, bio, interests } = req.body
+    const result = await pool.query(
+      `UPDATE users SET first_name=$1, last_name=$2, phone=$3, department=$4, year=$5, bio=$6, interests=$7 WHERE id=$8 RETURNING *`,
+      [first_name, last_name, phone, department, year, bio, JSON.stringify(interests || []), req.params.id]
+    )
+    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' })
+    res.json({ message: 'Profile updated', user: result.rows[0] })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
 
 module.exports = router
