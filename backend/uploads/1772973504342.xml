@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<events>
+  <event>
+    <title>Tech Fest 2025</title>
+    <description>Annual technical festival with coding competitions and project exhibitions</description>
+    <date>2025-08-15</date>
+    <location>Main Auditorium</location>
+    <category>technical</category>
+    <max_participants>300</max_participants>
+  </event>
+  <event>
+    <title>AI ML Workshop</title>
+    <description>Hands-on workshop on Artificial Intelligence and Machine Learning concepts</description>
+    <date>2025-09-05</date>
+    <location>Computer Lab 1</location>
+    <category>workshop</category>
+    <max_participants>60</max_participants>
+  </event>
+  <event>
+    <title>Hackathon 2025</title>
+    <description>24-hour hackathon to solve real-world problems using technology</description>
+    <date>2025-09-20</date>
+    <location>Engineering Block</location>
+    <category>technical</category>
+    <max_participants>150</max_participants>
+  </event>
+  <event>
+    <title>Cultural Night</title>
+    <description>Annual cultural event showcasing dance, music and drama performances</description>
+    <date>2025-10-02</date>
+    <location>Open Air Theatre</location>
+    <category>cultural</category>
+    <max_participants>500</max_participants>
+  </event>
+  <event>
+    <title>Web Development Bootcamp</title>
+    <description>3-day intensive bootcamp covering HTML, CSS, JavaScript and React</description>
+    <date>2025-10-10</date>
+    <location>Computer Lab 2</location>
+    <category>workshop</category>
+    <max_participants>50</max_participants>
+  </event>
+  <event>
+    <title>Industrial Visit - Pune</title>
+    <description>Visit to top IT companies in Pune for industry exposure</description>
+    <date>2025-10-18</date>
+    <location>Pune IT Park</location>
+    <category>industrial</category>
+    <max_participants>80</max_participants>
+  </event>
+  <event>
+    <title>Sports Day</title>
+    <description>Annual inter-department sports competition including cricket, football and athletics</description>
+    <date>2025-11-01</date>
+    <location>Sports Ground</location>
+    <category>sports</category>
+    <max_participants>400</max_participants>
+  </event>
+  <event>
+    <title>Cloud Computing Seminar</title>
+    <description>Seminar on AWS, Azure and Google Cloud platforms by industry experts</description>
+    <date>2025-11-08</date>
+    <location>Seminar Hall A</location>
+    <category>seminar</category>
+    <max_participants>100</max_participants>
+  </event>
+  <event>
+    <title>Project Expo 2025</title>
+    <description>Final year project exhibition open to all departments and industry judges</description>
+    <date>2025-11-15</date>
+    <location>Exhibition Hall</location>
+    <category>technical</category>
+    <max_participants>200</max_participants>
+  </event>
+  <event>
+    <title>Cybersecurity Workshop</title>
+    <description>Workshop on ethical hacking, network security and penetration testing</description>
+    <date>2025-11-22</date>
+    <location>Computer Lab 3</location>
+    <category>workshop</category>
+    <max_participants>45</max_participants>
+  </event>
+  <event>
+    <title>Fresher Welcome Party</title>
+    <description>Welcome event for first year students with games, music and food</description>
+    <date>2025-08-25</date>
+    <location>College Lawn</location>
+    <category>cultural</category>
+    <max_participants>350</max_participants>
+  </event>
+  <event>
+    <title>Data Science Bootcamp</title>
+    <description>Intensive 2-day bootcamp on Python, Pandas, NumPy and data visualization</description>
+    <date>2025-12-05</date>
+    <location>Computer Lab 1</location>
+    <category>workshop</category>
+    <max_participants>55</max_participants>
+  </event>
+  <event>
+    <title>Entrepreneurship Summit</title>
+    <description>Summit featuring startup founders, investors and business idea pitching competition</description>
+    <date>2025-12-12</date>
+    <location>Main Auditorium</location>
+    <category>seminar</category>
+    <max_participants>250</max_participants>
+  </event>
+  <event>
+    <title>Inter-College Coding Contest</title>
+    <description>Programming competition open to students from all colleges in the region</description>
+    <date>2025-12-20</date>
+    <location>Computer Lab 2</location>
+    <category>technical</category>
+    <max_participants>120</max_participants>
+  </event>
+  <event>
+    <title>Resume Building Workshop</title>
+    <description>Workshop on crafting the perfect resume and LinkedIn profile for placements</description>
+    <date>2026-01-10</date>
+    <location>Seminar Hall B</location>
+    <category>workshop</category>
+    <max_participants>90</max_participants>
+  </event>
+  <event>
+    <title>Civil Engineering Expo</title>
+    <description>Exhibition of civil engineering models and infrastructure projects by students</description>
+    <date>2026-01-20</date>
+    <location>Civil Block</location>
+    <category>technical</category>
+    <max_participants>150</max_participants>
+  </event>
+  <event>
+    <title>Photography Contest</title>
+    <description>Campus-wide photography contest with themes nature, architecture and candid</description>
+    <date>2026-02-05</date>
+    <location>Art Gallery</location>
+    <category>cultural</category>
+    <max_participants>75</max_participants>
+  </event>
+  <event>
+    <title>Mock Placement Drive</title>
+    <description>Simulated placement drive with aptitude test, group discussion and HR interview rounds</description>
+    <date>2026-02-14</date>
+    <location>Placement Cell</location>
+    <category>placement</category>
+    <max_participants>200</max_participants>
+  </event>
+  <event>
+    <title>Environmental Awareness Drive</title>
+    <description>Tree plantation drive and awareness campaign for a greener campus</description>
+    <date>2026-02-22</date>
+    <location>Campus Grounds</location>
+    <category>social</category>
+    <max_participants>300</max_participants>
+  </event>
+  <event>
+    <title>Annual Prize Distribution</title>
+    <description>Ceremony to felicitate top performers in academics, sports and extracurricular activities</description>
+    <date>2026-03-15</date>
+    <location>Main Auditorium</location>
+    <category>cultural</category>
+    <max_participants>600</max_participants>
+  </event>
+</events>

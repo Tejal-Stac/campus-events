@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<events>
+  <event>
+    <title>Tech Fest 2025</title>
+    <organising_club>Computer Society</organising_club>
+    <sa_vertical>Technical</sa_vertical>
+    <date>2025-08-15</date>
+    <day>Friday</day>
+    <time_from>09:00</time_from>
+    <time_to>17:00</time_to>
+    <venue>Main Auditorium</venue>
+    <online_link></online_link>
+    <target_audience>All Students</target_audience>
+    <expected_count>300</expected_count>
+    <seats>300</seats>
+    <fees>0</fees>
+    <contact>9876543210</contact>
+    <category>technical</category>
+    <key_features>Coding Competition, Project Exhibition, Guest Lecture</key_features>
+    <description>Annual technical festival with coding competitions and project exhibitions</description>
+    <faculty_id></faculty_id>
+  </event>
+  <event>
+    <title>AI ML Workshop</title>
+    <organising_club>AI Club</organising_club>
+    <sa_vertical>Technical</sa_vertical>
+    <date>2025-09-05</date>
+    <day>Friday</day>
+    <time_from>10:00</time_from>
+    <time_to>16:00</time_to>
+    <venue>Computer Lab 1</venue>
+    <online_link></online_link>
+    <target_audience>CSE and AI ML Students</target_audience>
+    <expected_count>60</expected_count>
+    <seats>60</seats>
+    <fees>100</fees>
+    <contact>9876543211</contact>
+    <category>workshop</category>
+    <key_features>Hands-on ML, Python, Neural Networks</key_features>
+    <description>Hands-on workshop on Artificial Intelligence and Machine Learning concepts</description>
+    <faculty_id></faculty_id>
+  </event>
+  <event>
+    <title>Hackathon 2025</title>
+    <organising_club>Developer Club</organising_club>
+    <sa_vertical>Technical</sa_vertical>
+    <date>2025-09-20</date>
+    <day>Saturday</day>
+    <time_from>08:00</time_from>
+    <time_to>08:00</time_to>
+    <venue>Engineering Block</venue>
+    <online_link></online_link>
+    <target_audience>All Engineering Students</target_audience>
+    <expected_count>150</expected_count>
+    <seats>150</seats>
+    <fees>200</fees>
+    <contact>9876543212</contact>
+    <category>technical</category>
+    <key_features>24 Hours, Team Event, Cash Prizes</key_features>
+    <description>24-hour hackathon to solve real-world problems using technology</description>
+    <faculty_id></faculty_id>
+  </event>
+  <event>
+    <title>Cultural Night</title>
+    <organising_club>Cultural Committee</organising_club>
+    <sa_vertical>Cultural</sa_vertical>
+    <date>2025-10-02</date>
+    <day>Thursday</day>
+    <time_from>18:00</time_from>
+    <time_to>22:00</time_to>
+    <venue>Open Air Theatre</venue>
+    <online_link></online_link>
+    <target_audience>All Students</target_audience>
+    <expected_count>500</expected_count>
+    <seats>500</seats>
+    <fees>0</fees>
+    <contact>9876543213</contact>
+    <category>cultural</category>
+    <key_features>Dance, Music, Drama, Food Stalls</key_features>
+    <description>Annual cultural event showcasing dance, music and drama performances</description>
+    <faculty_id></faculty_id>
+  </event>
+  <event>
+    <title>Web Development Bootcamp</title>
+    <organising_club>Web Dev Club</organising_club>
+    <sa_vertical>Technical</sa_vertical>
+    <date>2025-10-10</date>
+    <day>Friday</day>
+    <time_from>09:00</time_from>
+    <time_to>17:00</time_to>
+    <venue>Computer Lab 2</venue>
+    <online_link></online_link>
+    <target_audience>IT and CSE Students</target_audience>
+    <expected_count>50</expected_count>
+    <seats>50</seats>
+    <fees>150</fees>
+    <contact>9876543214</contact>
+    <category>workshop</category>
+    <key_features>HTML CSS JavaScript React, 3 Days</key_features>
+    <description>3-day intensive bootcamp covering HTML, CSS, JavaScript and React</description>
+    <faculty_id></faculty_id>
+  </event>
+  <event>
+    <title>Sports Day</title>
+    <organising_club>Sports Committee</organising_club>
+    <sa_vertical>Sports</sa_vertical>
+    <date>2025-11-01</date>
+    <day>Saturday</day>
+    <time_from>07:00</time_from>
+    <time_to>18:00</time_to>
+    <venue>Sports Ground</venue>
+    <online_link></online_link>
+    <target_audience>All Students</target_audience>
+    <expected_count>400</expected_count>
+    <seats>400</seats>
+    <fees>0</fees>
+    <contact>9876543215</contact>
+    <category>sports</category>
+    <key_features>Cricket, Football, Athletics, Tug of War</key_features>
+    <description>Annual inter-department sports competition including cricket, football and athletics</description>
+    <faculty_id></faculty_id>
+  </event>
+  <event>
+    <title>Cloud Computing Seminar</title>
+    <organising_club>Cloud Club</organising_club>
+    <sa_vertical>Technical</sa_vertical>
+    <date>2025-11-08</date>
+    <day>Saturday</day>
+    <time_from>10:00</time_from>
+    <time_to>13:00</time_to>
+    <venue>Seminar Hall A</venue>
+    <online_link></online_link>
+    <target_audience>All Engineering Students</target_audience>
+    <expected_count>100</expected_count>
+    <seats>100</seats>
+    <fees>0</fees>
+    <contact>9876543216</contact>
+    <category>seminar</category>
+    <key_features>AWS, Azure, Google Cloud, Industry Experts</key_features>
+    <description>Seminar on AWS, Azure and Google Cloud platforms by industry experts</description>
+    <faculty_id></faculty_id>
+  </event>
+  <event>
+    <title>Project Expo 2025</title>
+    <organising_club>Technical Committee</organising_club>
+    <sa_vertical>Technical</sa_vertical>
+    <date>2025-11-15</date>
+    <day>Saturday</day>
+    <time_from>09:00</time_from>
+    <time_to>17:00</time_to>
+    <venue>Exhibition Hall</venue>
+    <online_link></online_link>
+    <target_audience>Final Year Students</target_audience>
+    <expected_count>200</expected_count>
+    <seats>200</seats>
+    <fees>0</fees>
+    <contact>9876543217</contact>
+    <category>technical</category>
+    <key_features>Industry Judges, Best Project Award, All Departments</key_features>
+    <description>Final year project exhibition open to all departments and industry judges</description>
+    <faculty_id></faculty_id>
+  </event>
+  <event>
+    <title>Cybersecurity Workshop</title>
+    <organising_club>Cyber Club</organising_club>
+    <sa_vertical>Technical</sa_vertical>
+    <date>2025-11-22</date>
+    <day>Saturday</day>
+    <time_from>10:00</time_from>
+    <time_to>16:00</time_to>
+    <venue>Computer Lab 3</venue>
+    <online_link></online_link>
+    <target_audience>CSE and IT Students</target_audience>
+    <expected_count>45</expected_count>
+    <seats>45</seats>
+    <fees>200</fees>
+    <contact>9876543218</contact>
+    <category>workshop</category>
+    <key_features>Ethical Hacking, Network Security, Penetration Testing</key_features>
+    <description>Workshop on ethical hacking, network security and penetration testing</description>
+    <faculty_id></faculty_id>
+  </event>
+  <event>
+    <title>Entrepreneurship Summit</title>
+    <organising_club>E-Cell</organising_club>
+    <sa_vertical>Management</sa_vertical>
+    <date>2025-12-12</date>
+    <day>Friday</day>
+    <time_from>09:00</time_from>
+    <time_to>17:00</time_to>
+    <venue>Main Auditorium</venue>
+    <online_link></online_link>
+    <target_audience>All Students</target_audience>
+    <expected_count>250</expected_count>
+    <seats>250</seats>
+    <fees>0</fees>
+    <contact>9876543219</contact>
+    <category>seminar</category>
+    <key_features>Startup Pitching, Investors, Founders Talk</key_features>
+    <description>Summit featuring startup founders, investors and business idea pitching competition</description>
+    <faculty_id></faculty_id>
+  </event>
+</events>
