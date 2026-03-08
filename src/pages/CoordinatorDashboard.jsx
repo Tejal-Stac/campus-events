@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import userService from '../api/userService'
 
 const myEvents = [
   { id: 1, title: 'National Hackathon 2025', date: 'Mar 15, 2025', category: 'Hackathon', registered: 89, seats: 120, status: 'Active', volunteers: 12 },
@@ -18,25 +19,42 @@ const volunteers = [
 const duties = ['Registration Desk', 'Stage Management', 'Food & Logistics', 'Judging Coordination', 'Photography', 'Security', 'Guest Handling']
 
 export default function CoordinatorDashboard() {
-  const { user } = useAuth()
+  const { user: authUser } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
   const [newEvent, setNewEvent] = useState({ title: '', date: '', category: '', seats: '', venue: '', desc: '' })
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
   const updateEvent = (field, value) => setNewEvent(prev => ({ ...prev, [field]: value }))
+
+  // Fetch user profile with promotedByName
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const profileData = await userService.getProfile()
+        setUser(profileData)
+      } catch (error) {
+        console.error('Error fetching profile:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [])
 
   // Role-based protection: Redirect if not coordinator/club_head
   useEffect(() => {
-    if (user && user.role !== 'coordinator' && user.role !== 'club_head') {
+    if (authUser && authUser.role !== 'coordinator' && authUser.role !== 'club_head') {
       const roleRedirectMap = {
         student: '/dashboard',
         faculty: '/faculty-dashboard',
         dean: '/dean-dashboard',
         admin: '/admin'
       }
-      const redirectPath = roleRedirectMap[user.role] || '/dashboard'
+      const redirectPath = roleRedirectMap[authUser.role] || '/dashboard'
       navigate(redirectPath, { replace: true })
     }
-  }, [user, navigate])
+  }, [authUser, navigate])
 
   const inputStyle = {
     background: '#f8faff', border: '1px solid #cbd5e1', color: '#1a3a6b',
@@ -44,6 +62,10 @@ export default function CoordinatorDashboard() {
     fontSize: '13px', outline: 'none', boxSizing: 'border-box'
   }
   const labelStyle = { color: '#1a3a6b', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }
+
+  const getInitials = (firstName, lastName) => {
+    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase() || 'C'
+  }
 
   const tabs = [
     { id: 'overview', label: '📊 Overview' },
@@ -56,24 +78,36 @@ export default function CoordinatorDashboard() {
     <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
       <Navbar />
 
-      {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg, #1a3a6b, #2563eb)', paddingTop: '56px' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '28px 24px' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ background: '#fff', borderRadius: '50%', width: '56px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1a3a6b', fontWeight: '800', fontSize: '18px' }}>RC</div>
-              <div>
-                <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '700' }}>Coordinator Dashboard 🎯</h1>
-                <p style={{ color: '#bfdbfe', fontSize: '13px' }}>Rahul Coordinator · CSE Dept · VIT Pune</p>
+      {loading ? (
+        <div style={{ paddingTop: '100px', textAlign: 'center', color: '#1a3a6b' }}>
+          <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '4px solid #dbeafe', borderTop: '4px solid #1a3a6b', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+          <p style={{ marginTop: '16px', fontSize: '14px' }}>Loading profile...</p>
+        </div>
+      ) : (
+        <>
+          {/* Header */}
+          <div style={{ background: 'linear-gradient(135deg, #1a3a6b, #2563eb)', paddingTop: '56px' }}>
+            <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '28px 24px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ background: '#fff', borderRadius: '50%', width: '56px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1a3a6b', fontWeight: '800', fontSize: '18px' }}>
+                    {getInitials(user?.firstName, user?.lastName)}
+                  </div>
+                  <div>
+                    <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '700' }}>Coordinator Dashboard 🎯</h1>
+                    <p style={{ color: '#bfdbfe', fontSize: '13px' }}>
+                      {user?.firstName} {user?.lastName} · {user?.branch || 'N/A'} Dept · VIT Pune
+                      {user?.promotedByName && ` · Assigned by ${user.promotedByName}`}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setActiveTab('create')}
+                  style={{ background: '#fff', color: '#1a3a6b', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
+                  + Create New Event
+                </button>
               </div>
             </div>
-            <button onClick={() => setActiveTab('create')}
-              style={{ background: '#fff', color: '#1a3a6b', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
-              + Create New Event
-            </button>
           </div>
-        </div>
-      </div>
 
       <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px' }}>
 
@@ -315,6 +349,8 @@ export default function CoordinatorDashboard() {
       <footer style={{ background: '#1a3a6b', color: '#93c5fd', textAlign: 'center', padding: '20px', fontSize: '13px', marginTop: '40px' }}>
         © 2025 CampusEvents · Vishwakarma Institute of Technology, Pune
       </footer>
+        </>
+      )}
     </div>
   )
 }

@@ -12,11 +12,13 @@ export const authService = {
   async register(userData) {
     try {
       const response = await api.post('/auth/register', userData);
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+      if (response.data.data) {
+        // Note: token is not returned in new format, handle accordingly
+        if (response.data.data.user) {
+          localStorage.setItem('user', JSON.stringify(response.data.data.user));
+        }
       }
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
@@ -26,14 +28,17 @@ export const authService = {
   /**
    * Login user
    */
-  async login(email, password) {
+  async login(email, password, role) {
     try {
-      const response = await api.post('/auth/login', { email, password });
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+      const response = await api.post('/auth/login', { email, password, role });
+      if (response.data.data) {
+        const { token, user } = response.data.data;
+        if (token && user) {
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(user));
+        }
       }
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error('Login error:', error);
       throw error;

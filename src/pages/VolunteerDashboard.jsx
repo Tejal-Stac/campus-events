@@ -1,17 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-
-const volunteerInfo = {
-  name: 'Rahul Sharma',
-  gr: 'VIT2023CSE032',
-  department: 'Computer Engineering',
-  division: 'B',
-  year: '3rd Year',
-  campus: 'Kondhwa',
-  email: 'rahul.sharma23@vit.edu',
-  avatar: 'RS',
-  assignedBy: 'Dr. A. Mehta (Dean)',
-}
+import { useAuth } from '../context/AuthContext'
+import { userService } from '../api/userService'
 
 const assignedDuties = [
   {
@@ -62,8 +52,60 @@ const assignedDuties = [
 ]
 
 export default function VolunteerDashboard() {
+  const { user: authUser } = useAuth()
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedDuty, setSelectedDuty] = useState(null)
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  // Fetch user profile with promoted_by_name
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true)
+        const profile = await userService.getProfile()
+        setUser(profile)
+      } catch (err) {
+        console.error('Error fetching profile:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [])
+
+  // Get initials for avatar
+  const getInitials = (name) => {
+    if (!name) return 'VL'
+    const parts = name.split(' ')
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    }
+    return name.substring(0, 2).toUpperCase()
+  }
+
+  const volunteerInfo = {
+    name: user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Volunteer',
+    gr: user?.grNumber || 'N/A',
+    department: user?.department || 'N/A',
+    division: user?.division || 'N/A',
+    year: user?.year ? `${user.year}${user.year === 1 ? 'st' : user.year === 2 ? 'nd' : user.year === 3 ? 'rd' : 'th'} Year` : 'N/A',
+    campus: user?.campus || 'N/A',
+    email: user?.email || 'N/A',
+    avatar: getInitials(user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()),
+    assignedBy: user?.promotedByName || 'Dean Vedant Patkar',
+  }
+
+  if (loading) {
+    return (
+      <div style={{ background: '#f0f4ff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <p style={{ color: '#1a3a6b', fontSize: '16px', fontWeight: '600' }}>Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   const tabs = [
     { id: 'overview', label: '📊 Overview' },

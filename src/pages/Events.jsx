@@ -41,9 +41,17 @@ export default function Events() {
 
   const fetchData = async () => {
     try {
+      setLoading(true)
       // Fetch all events
-      const eventsData = await eventService.getEvents()
-      setEvents(eventsData)
+      const eventsData = await eventService.getAllEvents()
+      
+      // CRITICAL FIX: Only show approved events to students
+      const approvedEvents = eventsData.filter(event => 
+        event.status === 'approved' || event.status === 'Active'
+      )
+      
+      console.log(`📊 Fetched ${eventsData.length} total events, ${approvedEvents.length} approved`)
+      setEvents(approvedEvents)
       
       // Fetch user's registrations if logged in
       if (user) {

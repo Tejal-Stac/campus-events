@@ -1,35 +1,46 @@
 import api from './axiosConfig';
 
 /**
- * Event Service - Replace Firebase onSnapshot listeners
- * 
- * MIGRATION GUIDE:
- * Firebase: onSnapshot(collection(db, 'events'), (snapshot) => {...})
- * PostgreSQL: eventService.getEvents() with polling or WebSockets
+ * Event Service - PostgreSQL Integration
+ * All endpoints interact with D: drive PostgreSQL database
  */
 
 export const eventService = {
   /**
-   * Fetch all events (replaces Firebase onSnapshot for events collection)
-   * For Students: Display all available events
+   * Fetch all events
+   * Returns all events regardless of status (use filtering on frontend)
    */
-  async getEvents() {
+  async getAllEvents() {
     try {
       const response = await api.get('/events');
-      return response.data; // Array of event objects
+      return response.data.data;
     } catch (error) {
-      console.error('Error fetching events:', error);
+      console.error('Error fetching all events:', error);
       throw error;
     }
   },
 
   /**
-   * Create new event (Club Heads/Coordinators)
+   * Get single event by ID
+   */
+  async getEventById(eventId) {
+    try {
+      const response = await api.get(`/events/${eventId}`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching event:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Create new event (Faculty/Dean only)
+   * Automatically sets status='pending' and created_by=current user
    */
   async createEvent(eventData) {
     try {
       const response = await api.post('/events', eventData);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error('Error creating event:', error);
       throw error;
@@ -37,12 +48,39 @@ export const eventService = {
   },
 
   /**
-   * Register for an event
-   * NOTE: Backend needs to be updated to handle transactions
+   * Update event status (Dean ONLY)
+   * Valid statuses: 'pending', 'approved', 'rejected', 'Active', 'Completed'
+   */
+  async updateEventStatus(eventId, status) {
+    try {
+      const response = await api.put(`/events/${eventId}/status`, { status });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error updating event status:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Approve event (Dean only shortcut)
+   */
+  async approveEvent(eventId) {
+    return this.updateEventStatus(eventId, 'approved');
+  },
+
+  /**
+   * Reject event (Dean only shortcut)
+   */
+  async rejectEvent(eventId) {
+    return this.updateEventStatus(eventId, 'rejected');
+  },
+
+  /**
+   * Register for an event (Students only)
    */
   async registerForEvent(eventId) {
     try {
-      const response = await api.post('/events/register', { event_id: eventId });
+      const response = await api.post(`/events/${eventId}/register`);
       return response.data;
     } catch (error) {
       console.error('Error registering for event:', error);
@@ -51,31 +89,31 @@ export const eventService = {
   },
 
   /**
-   * Get participants for a specific event (Club Heads)
-   * NOTE: This endpoint needs to be created in backend
+   * Get event registrations/participants
    */
-  async getEventParticipants(eventId) {
+  async getEventRegistrations(eventId) {
     try {
-      const response = await api.get(`/events/${eventId}/participants`);
-      return response.data;
+      const response = await api.get(`/events/${eventId}/registrations`);
+      return response.data.data;
     } catch (error) {
-      console.error('Error fetching participants:', error);
+      console.error('Error fetching event registrations:', error);
       throw error;
     }
   },
 
-  /**
-   * Get events created by current user (Coordinators)
-   * NOTE: This endpoint needs to be created in backend
-   */
-  async getMyEvents() {
-    try {
-      const response = await api.get('/events/my-events');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching my events:', error);
-      throw error;
-    }
+  // Legacy alias for backward compatibility
+  getEvents() {
+    return this.getAllEvents();
+  },
+
+  // Legacy alias
+  getMyEvents() {
+    return this.getAllEvents();
+  },
+
+  // Legacy alias
+  getEventParticipants(eventId) {
+    return this.getEventRegistrations(eventId);
   },
 };
 

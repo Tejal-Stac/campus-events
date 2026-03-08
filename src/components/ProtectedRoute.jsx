@@ -30,17 +30,24 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
   }
 
   // Check role-based access if allowedRoles are specified
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    // User doesn't have permission, redirect to their appropriate dashboard
-    const redirectMap = {
-      student: '/dashboard',
-      club_head: '/coordinator',
-      coordinator: '/coordinator',
-      faculty: '/faculty',
-      dean: '/admin',
-      admin: '/admin',
+  if (allowedRoles.length > 0) {
+    // Check both primary role and assigned_role for coordinator access
+    const userEffectiveRole = user.assignedRole || user.assigned_role || user.role
+    const hasAccess = allowedRoles.includes(user.role) || allowedRoles.includes(userEffectiveRole)
+    
+    if (!hasAccess) {
+      // User doesn't have permission, redirect to their appropriate dashboard
+      const redirectMap = {
+        student: '/student-dashboard',
+        club_head: '/coordinator-dashboard',
+        coordinator: '/coordinator-dashboard',
+        faculty: '/faculty-dashboard',
+        dean: '/dean-dashboard',
+        volunteer: '/volunteer-dashboard',
+        admin: '/admin-dashboard',
+      }
+      return <Navigate to={redirectMap[userEffectiveRole] || redirectMap[user.role] || '/dashboard'} replace />
     }
-    return <Navigate to={redirectMap[user.role] || '/'} replace />
   }
 
   return children

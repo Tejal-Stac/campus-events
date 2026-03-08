@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 
 const roles = [
@@ -18,6 +19,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { login } = useAuth()
 
   const validateEmail = (email) => {
     if (email && !email.endsWith('@vit.edu')) {
@@ -38,31 +40,33 @@ export default function Login() {
     setError('')
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role: selectedRole })
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        localStorage.setItem('token', data.token)
-        localStorage.setItem('user', JSON.stringify(data.user))
-
-        if (selectedRole === 'student') navigate('/dashboard')
-        else if (selectedRole === 'faculty') navigate('/faculty')
-        else if (selectedRole === 'coordinator') navigate('/coordinator')
-        else if (selectedRole === 'volunteer') navigate('/volunteer')
-        else if (selectedRole === 'dean') navigate('/admin')
-      } else {
-        setError(data.message || 'Login failed!')
+      // Use AuthContext login function
+      const user = await login(email, password, selectedRole)
+      
+      console.log('🔍 Login Response:', user)
+      console.log('🔍 User Role:', user.role)
+      
+      // UNIFIED DASHBOARD MAP - Single source of truth for navigation
+      const dashboardMap = {
+        student: '/student-dashboard',
+        coordinator: '/coordinator-dashboard',
+        club_head: '/coordinator-dashboard',
+        volunteer: '/volunteer-dashboard',
+        faculty: '/faculty-dashboard',
+        dean: '/dean-dashboard',
+        admin: '/admin-dashboard',
       }
+      
+      const targetPath = dashboardMap[user.role] || '/dashboard'
+      console.log(`➡️ Navigating to: ${targetPath}`)
+      navigate(targetPath, { replace: true })
+      
     } catch (err) {
-      setError('Cannot connect to server! Make sure backend is running.')
+      console.error('❌ Login error:', err)
+      setError(err.response?.data?.message || 'Cannot connect to server! Make sure backend is running.')
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   const inputStyle = {

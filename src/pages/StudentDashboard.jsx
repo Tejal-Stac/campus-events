@@ -25,13 +25,16 @@ export default function StudentDashboard() {
       // Fetch user's registered events from PostgreSQL
       const registrations = await userService.getMyRegistrations()
       
-      // Filter upcoming events (events with date >= today)
+      // CRITICAL FIX: Filter for approved events only and upcoming dates
       const now = new Date()
-      const upcoming = registrations?.filter(event => {
-        const eventDate = new Date(event.date)
-        return eventDate >= now
-      }) || []
+      const upcoming = (registrations || []).filter(event => {
+        const eventDate = new Date(event.date || event.event_date)
+        const isUpcoming = eventDate >= now
+        const isApproved = event.status === 'approved' || event.status === 'Active'
+        return isUpcoming && isApproved
+      })
       
+      console.log(`📊 Student Dashboard: ${registrations?.length || 0} total registrations, ${upcoming.length} approved & upcoming`)
       setUpcomingEvents(upcoming)
       setError(null)
     } catch (err) {
@@ -80,7 +83,12 @@ export default function StudentDashboard() {
 
   // Get user initials for avatar
   const getInitials = (name) => {
-    return name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'NA'
+    if (!name) return 'NA'
+    const parts = name.split(' ')
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    }
+    return name.substring(0, 2).toUpperCase()
   }
 
   // Format date for display
@@ -104,16 +112,21 @@ export default function StudentDashboard() {
       {/* Student Info Bar - VIT Style */}
       <div style={{ background: '#fff', borderBottom: '1px solid #dbeafe', padding: '10px 24px', marginTop: '56px', display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
         <div className="flex items-center gap-3">
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#1a3a6b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '16px' }}>{getInitials(student?.name)}</div>
+          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#1a3a6b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '16px' }}>
+            {getInitials(student?.name || `${student?.firstName} ${student?.lastName}`)}
+          </div>
           <div>
-            <p style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '15px' }}>{student?.name || 'Student'}</p>
+            <p style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '15px' }}>
+              {student?.name || `${student?.firstName || ''} ${student?.lastName || ''}`.trim() || 'Student'}
+            </p>
             <div className="flex items-center gap-2">
               <span style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '20px', fontSize: '11px', padding: '2px 10px', fontWeight: '600' }}>● Active</span>
             </div>
           </div>
         </div>
         <div style={{ color: '#64748b', fontSize: '13px' }}>Email: <strong style={{ color: '#1a3a6b' }}>{student?.email || 'N/A'}</strong></div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>Role: <strong style={{ color: '#1a3a6b' }}>{student?.role || 'Student'}</strong></div>
+        <div style={{ color: '#64748b', fontSize: '13px' }}>GR No: <strong style={{ color: '#1a3a6b' }}>{student?.grNumber || 'N/A'}</strong></div>
+        <div style={{ color: '#64748b', fontSize: '13px' }}>Dept: <strong style={{ color: '#1a3a6b' }}>{student?.department || 'N/A'}</strong></div>
         <div style={{ color: '#64748b', fontSize: '13px' }}>Points: <strong style={{ color: '#1a3a6b' }}>{student?.points || 0}</strong></div>
       </div>
 

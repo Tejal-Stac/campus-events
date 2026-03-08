@@ -29,9 +29,18 @@ function SmartHomeRoute() {
     )
   }
   
-  // Auto-redirect: If logged in, go to dashboard
+  // Auto-redirect: If logged in, go to role-specific dashboard
   if (user) {
-    return <Navigate to="/dashboard" replace />
+    const dashboardMap = {
+      student: '/student-dashboard',
+      coordinator: '/coordinator-dashboard',
+      volunteer: '/volunteer-dashboard',
+      faculty: '/faculty-dashboard',
+      dean: '/dean-dashboard',
+      admin: '/admin-dashboard',
+      club_head: '/coordinator-dashboard',
+    }
+    return <Navigate to={dashboardMap[user.role] || '/student-dashboard'} replace />
   }
   
   return <Home />
@@ -67,6 +76,42 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          
+          {/* Standardized Dashboard Routes */}
+          <Route 
+            path="/student-dashboard" 
+            element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <StudentDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/coordinator-dashboard" 
+            element={
+              <ProtectedRoute allowedRoles={['coordinator', 'club_head']}>
+                <CoordinatorDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin-dashboard" 
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'dean']}>
+                <AdminPanel />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/volunteer-dashboard" 
+            element={
+              <ProtectedRoute allowedRoles={['volunteer']}>
+                <VolunteerDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Legacy Routes (kept for backward compatibility) */}
           <Route 
             path="/coord-dashboard" 
             element={
