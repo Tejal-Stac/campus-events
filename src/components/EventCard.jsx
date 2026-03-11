@@ -1,0 +1,472 @@
+import React, { useState } from 'react'
+
+/**
+ * Universal EventCard Component
+ * Used across Student, Dean, and Faculty dashboards
+ * 
+ * @param {Object} event - Event data object
+ * @param {string} role - User role: 'student', 'dean', or 'faculty'
+ * @param {Function} onAction - Callback for role-specific actions
+ * @param {boolean} isRegistered - Whether student is already registered (student role only)
+ */
+export default function EventCard({ event, role, onAction, isRegistered = false }) {
+  const [remarks, setRemarks] = useState('')
+  const [imageError, setImageError] = useState(false)
+  
+  // Image handling - Category-based fallback system
+  const getCategoryImage = (category) => {
+    const images = {
+      'Technical': 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800',
+      'Cultural': 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=800',
+      'Sports': 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800',
+      'Workshop': 'https://images.unsplash.com/photo-1540317580384-e5d43616e00b?w=800',
+      'Seminar': 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800',
+      'Conference': 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800',
+      'Hackathon': 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800',
+      'Competition': 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800',
+      'General': 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800',
+      'default': 'https://images.unsplash.com/photo-1562774053-701939374585?w=800'
+    }
+    // Normalize category (handle null/undefined and case variations)
+    const normalizedCategory = category?.trim() || 'default'
+    return images[normalizedCategory] || images.default
+  }
+  
+  // Handle both database schemas
+  const maxParticipants = event.max_participants || event.capacity || event.seats || 100
+  const registeredCount = event.registered_count || event.registered || 0
+  const pct = Math.round((registeredCount / maxParticipants) * 100)
+  
+  // Format date
+  const eventDate = event.date ? new Date(event.date).toLocaleDateString('en-US', { 
+    year: 'numeric', month: 'short', day: 'numeric' 
+  }) : 'TBA'
+  
+  // Get event image with robust fallback logic
+  // Handle null, undefined, empty string, and whitespace-only values
+  const hasValidImage = event.image_url && event.image_url.trim().length > 0
+  const eventImage = imageError 
+    ? getCategoryImage(event.category) 
+    : (hasValidImage ? event.image_url.trim() : getCategoryImage(event.category))
+  
+  // Handle key features - robust parsing for JSON strings and arrays
+  const getFeatures = () => {
+    const features = event.keyFeatures || event.key_features
+    
+    // Already an array
+    if (Array.isArray(features)) return features
+    
+    // JSON string like '["Certificates","Prizes"]' or '{"key": "value"}'
+    if (typeof features === 'string' && features.trim()) {
+      try {
+        const parsed = JSON.parse(features)
+        if (Array.isArray(parsed)) return parsed
+      } catch (e) {
+        // Not JSON, treat as comma-separated string
+        return features.split(',').map(f => f.trim()).filter(Boolean)
+      }
+    }
+    
+    return []
+  }
+  
+  const featuresArray = getFeatures()
+  
+  // CSV Export Utility Functions
+  const downloadAttendanceCSV = () => {
+    // This would typically fetch registrations from API, but we'll use event data
+    const csvContent = [
+      ['Attendance Report - ' + event.title],
+      [''],
+      ['Event Details:'],
+      ['Title', event.title],
+      ['Date', eventDate],
+      ['Venue', event.location || event.venue || 'TBA'],
+      ['Organizer', event.organizing_club || event.organising_club || event.organisingClub || 'N/A'],
+      [''],
+      ['Registration Statistics:'],
+      ['Total Seats', maxParticipants],
+      ['Registered', registeredCount],
+      ['Available', maxParticipants - registeredCount],
+      ['Occupancy Rate', pct + '%'],
+      [''],
+      ['Generated on', new Date().toLocaleString()],
+      [''],
+      ['Note: For detailed attendee list, please use the View Applicants feature in the dashboard.']
+    ].map(row => row.join(',')).join('\n')
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${event.title.replace(/[^a-z0-9]/gi, '_')}_attendance.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+  
+  const downloadEventReportCSV = () => {
+    const csvContent = [
+      ['Event Comprehensive Report'],
+      [''],
+      ['Basic Information:'],
+      ['Event Title', event.title],
+      ['Category', event.category || 'General'],
+      ['SA Vertical', event.saVertical || event.sa_vertical || event.eventType || 'General'],
+      [''],
+      ['Organization Details:'],
+      ['Organizing Club/Dept', event.organizing_club || event.organising_club || event.organisingClub || 'N/A'],
+      ['Department', event.department || 'N/A'],
+      [''],
+      ['Schedule:'],
+      ['Date', eventDate],
+      ['Day', event.day || 'N/A'],
+      ['Start Time', event.timeFrom || event.time_from || 'TBA'],
+      ['End Time', event.timeTo || event.time_to || 'TBA'],
+      [''],
+      ['Venue Information:'],
+      ['Physical Venue', event.location || event.venue || 'TBA'],
+      ['Online Link', event.onlineLink || event.online_link || 'N/A'],
+      [''],
+      ['Participation Details:'],
+      ['Target Audience', event.target_audience || event.targetAudience || 'All'],
+      ['Total Capacity', maxParticipants],
+      ['Current Registrations', registeredCount],
+      ['Available Seats', maxParticipants - registeredCount],
+      ['Occupancy Rate', pct + '%'],
+      ['Expected Count', event.expected_count || event.expectedCount || 'N/A'],
+      [''],
+      ['Financial:'],
+      ['Registration Fees', event.fees || 'Free'],
+      [''],
+      ['Contact Information:'],
+      ['Contact Person', event.contact || 'N/A'],
+      ['Contact Number', event.contactNumber || event.contact_number || 'N/A'],
+      [''],
+      ['Additional Details:'],
+      ['Description', (event.description || event.desc || 'N/A').replace(/,/g, ';')],
+      ['Key Features', featuresArray.join(' | ') || 'N/A'],
+      ['Status', event.status || 'Active'],
+      [''],
+      ['Report Generated:', new Date().toLocaleString()],
+      ['Generated By:', 'Campus Events Management System']
+    ].map(row => row.join(',')).join('\n')
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${event.title.replace(/[^a-z0-9]/gi, '_')}_full_report.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+  
+  // Render action buttons based on role
+  const renderActions = () => {
+    if (role === 'student') {
+      return (
+        <button
+          className={`w-full py-3 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${
+            pct >= 100 
+              ? 'bg-gray-300 text-gray-600 cursor-not-allowed' 
+              : isRegistered
+              ? 'bg-green-600 text-white cursor-default border-2 border-green-700'
+              : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:scale-105 hover:shadow-lg active:scale-95'
+          }`}
+          onClick={() => onAction && onAction('register', event.id)}
+          disabled={pct >= 100 || isRegistered}>
+          {pct >= 100 ? (
+            <>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Fully Booked
+            </>
+          ) : isRegistered ? (
+            <>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Already Registered
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+              Register Now
+            </>
+          )}
+        </button>
+      )
+    }
+    
+    if (role === 'dean') {
+      return (
+        <div className="space-y-3">
+          {/* Remarks textarea */}
+          <textarea
+            placeholder="Add remarks (optional)..."
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            rows="2"
+          />
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => onAction && onAction('approve', event.id, remarks)}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 active:scale-95">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Approve
+            </button>
+            <button
+              onClick={() => onAction && onAction('reject', event.id, remarks)}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 active:scale-95">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Reject
+            </button>
+          </div>
+        </div>
+      )
+    }
+    
+    if (role === 'faculty') {
+      return (
+        <div className="space-y-2">
+          {/* Primary Action: Edit */}
+          <button
+            onClick={() => onAction && onAction('edit', event.id)}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 active:scale-95">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit Event
+          </button>
+          
+          {/* Secondary Actions Row */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={downloadAttendanceCSV}
+              className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white py-2 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1.5 hover:scale-105 active:scale-95">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Attendance
+            </button>
+            <button
+              onClick={downloadEventReportCSV}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-2 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1.5 hover:scale-105 active:scale-95">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Full Report
+            </button>
+          </div>
+          
+          {/* Analytics Button */}
+          <button
+            onClick={() => onAction && onAction('analytics', event.id)}
+            className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 active:scale-95">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            View Applicants
+          </button>
+        </div>
+      )
+    }
+    
+    return null
+  }
+
+  return (
+    <div
+      className="group bg-white rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
+      style={{ boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
+
+      {/* Hero Image Section */}
+      <div className="relative h-48 overflow-hidden">
+        <img 
+          src={eventImage} 
+          alt={event.title}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          onError={(e) => {
+            if (!imageError) {
+              setImageError(true)
+              e.target.src = getCategoryImage(event.category)
+            }
+          }}
+        />
+        
+        {/* Glassmorphism Overlay Badges */}
+        <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
+          <div className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white backdrop-blur-md bg-white/20 border border-white/30 shadow-lg">
+            {event.saVertical || event.sa_vertical || event.eventType || 'General'}
+          </div>
+          <div className="px-3 py-1.5 rounded-lg text-xs font-bold text-white backdrop-blur-md bg-gradient-to-r from-indigo-500/80 to-purple-500/80 border border-white/30 shadow-lg">
+            {event.category}
+          </div>
+        </div>
+        
+        {/* Gradient Overlay at Bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/60 to-transparent"></div>
+      </div>
+
+      <div className="p-5">
+        {/* Title */}
+        <h3 className="text-2xl font-bold text-gray-900 mb-3 line-clamp-2 leading-tight">
+          {event.title}
+        </h3>
+
+        {/* Description */}
+        {event.description && (
+          <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
+            {event.description}
+          </p>
+        )}
+
+        {/* Organized By */}
+        <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+          <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+          <span className="text-xs font-semibold text-indigo-900">
+            {event.organizing_club || event.organising_club || event.organisingClub || 'N/A'}
+          </span>
+        </div>
+
+        {/* 2-Column Grid for Details */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {/* Date */}
+          <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg">
+            <svg className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-500 font-medium">Date</p>
+              <p className="text-xs font-bold text-gray-900 truncate">{eventDate}</p>
+            </div>
+          </div>
+          
+          {/* Time */}
+          {(event.timeFrom || event.time_from) && (
+            <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg">
+              <svg className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500 font-medium">Time</p>
+                <p className="text-xs font-bold text-gray-900 truncate">{event.timeFrom || event.time_from}</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Venue */}
+          <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg">
+            <svg className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-500 font-medium">Venue</p>
+              <p className="text-xs font-bold text-gray-900 truncate">{event.location || event.venue || 'TBA'}</p>
+            </div>
+          </div>
+          
+          {/* Fees */}
+          <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg">
+            <svg className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-500 font-medium">Fees</p>
+              <p className={`text-xs font-bold truncate ${event.fees === 'Free' || event.fees === '0' || !event.fees ? 'text-green-600' : 'text-red-600'}`}>
+                {event.fees || 'Free'}
+              </p>
+            </div>
+          </div>
+          
+          {/* Audience */}
+          {(event.target_audience || event.targetAudience) && (
+            <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg col-span-2">
+              <svg className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500 font-medium">Audience</p>
+                <p className="text-xs font-bold text-gray-900">{event.target_audience || event.targetAudience}</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Contact */}
+          {event.contact && (
+            <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg col-span-2">
+              <svg className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500 font-medium">Contact</p>
+                <p className="text-xs font-bold text-gray-900">{event.contact}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Key Features with Pastel Backgrounds */}
+        {featuresArray.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-bold text-gray-700 mb-2">✨ Key Features</p>
+            <div className="flex flex-wrap gap-1.5">
+              {featuresArray.map((f, idx) => {
+                const colors = [
+                  'bg-pink-50 text-pink-700 border-pink-200',
+                  'bg-purple-50 text-purple-700 border-purple-200',
+                  'bg-blue-50 text-blue-700 border-blue-200',
+                  'bg-green-50 text-green-700 border-green-200',
+                  'bg-yellow-50 text-yellow-700 border-yellow-200',
+                ]
+                return (
+                  <span key={`${f}-${idx}`} className={`${colors[idx % colors.length]} border rounded-full text-xs px-3 py-1 font-medium`}>
+                    {f}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Registration Progress Bar (only for student/faculty roles) */}
+        {(role === 'student' || role === 'faculty') && (
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-xs text-gray-600 font-medium">
+                {registeredCount}/{maxParticipants} registered
+              </span>
+              <span className={`text-xs font-bold ${pct > 80 ? 'text-red-600' : 'text-indigo-600'}`}>
+                {pct}%
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div 
+                className={`h-2 rounded-full transition-all duration-500 ${pct > 80 ? 'bg-gradient-to-r from-red-500 to-pink-500' : 'bg-gradient-to-r from-indigo-600 to-purple-600'}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Role-based Action Buttons */}
+        {renderActions()}
+      </div>
+    </div>
+  )
+}

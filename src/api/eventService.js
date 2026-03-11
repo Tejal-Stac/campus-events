@@ -48,6 +48,20 @@ export const eventService = {
   },
 
   /**
+   * Update existing event (Faculty/Dean only)
+   * Faculty can only update events they created
+   */
+  async updateEvent(eventId, eventData) {
+    try {
+      const response = await api.put(`/events/${eventId}`, eventData);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error updating event:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Update event status (Dean ONLY)
    * Valid statuses: 'pending', 'approved', 'rejected', 'Active', 'Completed'
    */

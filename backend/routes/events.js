@@ -5,7 +5,7 @@ const pool = require('../config/db')
 const auth = require('../middleware/auth')
 const { isDean, isFacultyOrDean } = require('../middleware/auth')
 const {
-  getAllEvents, getEventById, createEvent,
+  getAllEvents, getEventById, createEvent, updateEvent,
   updateEventStatus, registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers
 } = require('../controllers/eventController')
@@ -20,6 +20,7 @@ router.get('/coordinator/volunteers', auth, getCoordinatorVolunteers)
 
 // Protected routes - Manual event creation
 router.post('/', auth, isFacultyOrDean, createEvent)
+router.put('/:id', auth, isFacultyOrDean, updateEvent) // Faculty can edit their own events
 router.put('/:id/status', auth, isDean, updateEventStatus) // Dean-only approval
 router.post('/:id/register', auth, registerForEvent) // Legacy route
 router.post('/register/:id', auth, registerForEvent) // New preferred route

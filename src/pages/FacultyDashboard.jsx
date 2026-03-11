@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { eventService } from '../api/eventService'
+import EventCard from '../components/EventCard'
 
 const saVerticals = [
   'Technical', 'Cultural', 'Sports', 'Social', 'Entrepreneurship',
@@ -497,79 +498,23 @@ export default function FacultyDashboard() {
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
-                {myEvents.map(e => {
-                  const pct = e.seats ? Math.round(((e.registered || 0) / e.seats) * 100) : 0
-                  return (
-                    <div key={e.id} style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '20px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <span style={{ background: '#eff6ff', color: '#1d4ed8', borderRadius: '6px', fontSize: '12px', padding: '3px 10px', fontWeight: '600' }}>{e.category || 'Event'}</span>
-                        <span style={{ background: e.status === 'Active' ? '#dcfce7' : '#f1f5f9', color: e.status === 'Active' ? '#16a34a' : '#64748b', borderRadius: '6px', fontSize: '11px', padding: '3px 8px', fontWeight: '600' }}>{e.status || 'Active'}</span>
-                      </div>
-                      <h3 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px', marginBottom: '10px' }}>{e.title}</h3>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <span style={{ fontSize: '11px' }}>📅</span>
-                          <span style={{ color: '#64748b', fontSize: '11px' }}>Date:</span>
-                          <span style={{ color: '#1a3a6b', fontSize: '11px', fontWeight: '600' }}>{formatDate(e.date)}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <span style={{ fontSize: '11px' }}>⏰</span>
-                          <span style={{ color: '#64748b', fontSize: '11px' }}>Time:</span>
-                          <span style={{ color: '#1a3a6b', fontSize: '11px', fontWeight: '600' }}>{e.time_from || e.timeFrom || 'TBA'} to {e.time_to || e.timeTo || 'TBA'}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <span style={{ fontSize: '11px' }}>📍</span>
-                          <span style={{ color: '#64748b', fontSize: '11px' }}>Venue:</span>
-                          <span style={{ color: '#1a3a6b', fontSize: '11px', fontWeight: '600' }}>{e.venue}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <span style={{ fontSize: '11px' }}>👥</span>
-                          <span style={{ color: '#64748b', fontSize: '11px' }}>Capacity:</span>
-                          <span style={{ color: '#1a3a6b', fontSize: '11px', fontWeight: '600' }}>{e.seats || 'N/A'}</span>
-                        </div>
-                      </div>
-
-                      <div style={{ marginBottom: '14px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ color: '#64748b', fontSize: '11px' }}>{e.registered || 0}/{e.seats} registered</span>
-                          <span style={{ color: pct > 80 ? '#dc2626' : '#16a34a', fontSize: '11px', fontWeight: '600' }}>{pct}%</span>
-                        </div>
-                        <div style={{ background: '#dbeafe', borderRadius: '4px', height: '6px' }}>
-                          <div style={{ width: `${pct}%`, background: pct > 80 ? '#dc2626' : '#1a3a6b', borderRadius: '4px', height: '6px' }} />
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <button 
-                          onClick={() => handleEditEvent(e)}
-                          style={{ flex: 1, minWidth: '70px', background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button 
-                          onClick={() => handleViewApplicants(e)}
-                          style={{ flex: 1, minWidth: '70px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
-                        >
-                          👥 Applicants
-                        </button>
-                        <button 
-                          onClick={() => downloadReportCSV(e)}
-                          style={{ flex: 1, minWidth: '70px', background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
-                        >
-                          📊 CSV
-                        </button>
-                        <button 
-                          onClick={() => downloadReportPDF(e)}
-                          style={{ flex: 1, minWidth: '70px', background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '8px', padding: '7px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
-                        >
-                          📜 PDF
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {myEvents.map(e => (
+                  <EventCard
+                    key={e.id}
+                    event={e}
+                    role="faculty"
+                    onAction={(action, eventId) => {
+                      if (action === 'edit') {
+                        const event = myEvents.find(ev => ev.id === eventId)
+                        if (event) handleEditEvent(event)
+                      } else if (action === 'analytics') {
+                        const event = myEvents.find(ev => ev.id === eventId)
+                        if (event) handleViewApplicants(event)
+                      }
+                    }}
+                  />
+                ))}
               </div>
             )}
           </div>
