@@ -11,13 +11,14 @@ const isDean = (req, res, next) => {
   next()
 }
 
-// Get current user's profile (alias for auth profile endpoint)
+// Get current user's profile
 router.get('/profile', auth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT u1.id, u1.first_name, u1.last_name, u1.email, u1.role, u1.assigned_role, 
               u1.department, u1.division, u1.year, u1.gr_number, u1.campus, u1.phone, 
               u1.designation, u1.interests, u1.organising_club, u1.assigned_event_id, u1.created_at,
+              u1.college_type, u1.college_name,
               (u2.first_name || ' ' || u2.last_name) AS promoted_by_name
        FROM users u1
        LEFT JOIN users u2 ON u1.promoted_by = u2.id
@@ -50,7 +51,9 @@ router.get('/profile', auth, async (req, res) => {
       organisingClub: user.organising_club,
       assignedEventId: user.assigned_event_id,
       promotedByName: user.promoted_by_name,
-      points: 0, // TODO: Calculate from events/activities
+      collegeType: user.college_type,
+      collegeName: user.college_name,
+      points: 0,
       createdAt: user.created_at
     }
 
@@ -58,6 +61,49 @@ router.get('/profile', auth, async (req, res) => {
   } catch (err) {
     console.error('GET PROFILE ERROR:', err.message)
     res.status(500).json({ success: false, message: 'Server error', error: err.message })
+  }
+})
+
+// GET pending non-VITian approvals (coordinator/admin/dean only)
+router.get('/pending-approvals', auth, async (req, res) => {
+  const allowedRoles = ['coordinator', 'admin', 'dean']
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ message: 'Unauthorized' })
+  }
+  try {
+    const result = await pool.query(
+      `SELECT id, first_name, last_name, email, college_name, college_email, phone, created_at
+       FROM users
+       WHERE is_approved = FALSE AND college_type = 'non_vitian'
+       ORDER BY created_at DESC`
+    )
+    res.json({ success: true, data: result.rows })
+  } catch (err) {
+    console.error('PENDING APPROVALS ERROR:', err.message)
+    res.status(500).json({ success: false, message: 'Server error' })
+  }
+})
+
+// PATCH approve or reject a non-VITian
+router.patch('/:id/approve', auth, async (req, res) => {
+  const allowedRoles = ['coordinator', 'admin', 'dean']
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ message: 'Unauthorized' })
+  }
+  const { approve } = req.body
+  try {
+    if (!approve) {
+      await pool.query('DELETE FROM users WHERE id = $1', [req.params.id])
+      return res.json({ success: true, message: 'User rejected and removed.' })
+    }
+    const result = await pool.query(
+      `UPDATE users SET is_approved = TRUE WHERE id = $1 RETURNING id, first_name, last_name, email`,
+      [req.params.id]
+    )
+    res.json({ success: true, message: 'User approved!', data: result.rows[0] })
+  } catch (err) {
+    console.error('APPROVE USER ERROR:', err.message)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
 })
 
@@ -89,8 +135,6 @@ router.get('/students', auth, isDean, async (req, res) => {
        WHERE role = 'student'
        ORDER BY first_name, last_name`
     )
-    
-    // Format response with camelCase
     const students = result.rows.map(user => ({
       id: user.id,
       email: user.email,
@@ -107,7 +151,6 @@ router.get('/students', auth, isDean, async (req, res) => {
       phone: user.phone,
       createdAt: user.created_at
     }))
-
     res.json({ success: true, data: students })
   } catch (err) {
     console.error('GET STUDENTS ERROR:', err.message)
@@ -120,7 +163,6 @@ router.put('/:id/promote', auth, isDean, async (req, res) => {
   const { assignedRole } = req.body
   const userId = req.params.id
 
-  // Validate assigned role
   if (!['coordinator', 'volunteer'].includes(assignedRole)) {
     return res.status(400).json({ 
       success: false,
@@ -129,24 +171,19 @@ router.put('/:id/promote', auth, isDean, async (req, res) => {
   }
 
   try {
-    // Verify user exists and is a student
     const userCheck = await pool.query(
       'SELECT id, role, first_name, last_name FROM users WHERE id = $1',
       [userId]
     )
-
     if (userCheck.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
-
     if (userCheck.rows[0].role !== 'student') {
       return res.status(400).json({ 
         success: false,
         message: 'Can only promote students. User is not a student.' 
       })
     }
-
-    // Update assigned_role and promoted_by (set to Dean's ID)
     const result = await pool.query(
       `UPDATE users 
        SET assigned_role = $1, promoted_by = $2, updated_at = NOW()
@@ -154,11 +191,8 @@ router.put('/:id/promote', auth, isDean, async (req, res) => {
        RETURNING id, first_name, last_name, email, role, assigned_role`,
       [assignedRole, req.user.id, userId]
     )
-
     const updatedUser = result.rows[0]
-
-    console.log(`✅ Dean ${req.user.email} promoted ${updatedUser.first_name} ${updatedUser.last_name} to ${assignedRole}`)
-
+    console.log(`✅ Dean ${req.user.email} promoted ${updatedUser.first_name} to ${assignedRole}`)
     res.json({
       success: true,
       message: `${updatedUser.first_name} ${updatedUser.last_name} has been promoted to ${assignedRole}!`,
@@ -194,37 +228,27 @@ router.get('/', auth, async (req, res) => {
 // Update user role (Coordinator can upgrade students to volunteers)
 router.put('/update-role', auth, async (req, res) => {
   const { userId, role, eventId } = req.body
-
-  // Validate role
   if (!['volunteer', 'student'].includes(role)) {
     return res.status(400).json({ 
       success: false,
       message: 'Invalid role. Can only set volunteer or student.' 
     })
   }
-
   try {
-    // Check if user exists
     const userCheck = await pool.query(
       'SELECT id, role, first_name, last_name FROM users WHERE id = $1',
       [userId]
     )
-
     if (userCheck.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
-
-    // Update assigned_role and optionally assigned_event_id
     const updateQuery = eventId 
       ? 'UPDATE users SET assigned_role = $1, assigned_event_id = $2 WHERE id = $3 RETURNING *'
       : 'UPDATE users SET assigned_role = $1, assigned_event_id = NULL WHERE id = $2 RETURNING *'
-    
     const params = eventId ? [role, eventId, userId] : [role, userId]
     const result = await pool.query(updateQuery, params)
-
     const updatedUser = result.rows[0]
-    console.log(`✅ User ${updatedUser.first_name} role updated to ${role} by coordinator ${req.user.email}`)
-
+    console.log(`✅ User ${updatedUser.first_name} role updated to ${role}`)
     res.json({
       success: true,
       message: `${updatedUser.first_name} ${updatedUser.last_name} is now a ${role}!`,
@@ -255,7 +279,7 @@ router.put('/:id/assign-role', auth, async (req, res) => {
   }
 })
 
-// Remove assigned role from user (admin access)
+// Remove assigned role from user
 router.put('/:id/remove-role', auth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -267,7 +291,8 @@ router.put('/:id/remove-role', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message })
   }
 })
-// PUT /api/users/:id - Update user profile
+
+// Update user profile
 router.put('/:id', auth, async (req, res) => {
   try {
     const { first_name, last_name, phone, department, year, bio, interests } = req.body

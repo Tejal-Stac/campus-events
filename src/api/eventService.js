@@ -8,11 +8,21 @@ import api from './axiosConfig';
 export const eventService = {
   /**
    * Fetch all events
-   * Returns all events regardless of status (use filtering on frontend)
+   * Optionally filter by category and/or event_type
+   * event_type values: 'National' | 'Intercollege' | 'Intracollege' | 'Department'
    */
-  async getAllEvents() {
+  async getAllEvents(filters = {}) {
     try {
-      const response = await api.get('/events');
+      const params = new URLSearchParams();
+      if (filters.category && filters.category !== 'All') {
+        params.append('category', filters.category);
+      }
+      // ── NEW: event_type filter ──
+      if (filters.event_type && filters.event_type !== 'All') {
+        params.append('event_type', filters.event_type);
+      }
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const response = await api.get(`/events${query}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching all events:', error);
@@ -34,8 +44,10 @@ export const eventService = {
   },
 
   /**
-   * Create new event (Faculty/Dean only)
+   * Create new event (Coordinator only)
    * Automatically sets status='pending' and created_by=current user
+   * Required: title, date, venue, category, event_type
+   * event_type values: 'National' | 'Intercollege' | 'Intracollege' | 'Department'
    */
   async createEvent(eventData) {
     try {
@@ -57,6 +69,20 @@ export const eventService = {
       return response.data.data;
     } catch (error) {
       console.error('Error updating event status:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * ── NEW: Update event type (Coordinator/Dean only) ──
+   * Valid types: 'National' | 'Intercollege' | 'Intracollege' | 'Department'
+   */
+  async updateEventType(eventId, event_type) {
+    try {
+      const response = await api.patch(`/events/${eventId}/event-type`, { event_type });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error updating event type:', error);
       throw error;
     }
   },
@@ -102,7 +128,7 @@ export const eventService = {
   },
 
   /**
-   * Get coordinator stats (events, registrations, volunteers)
+   * Get coordinator stats (events, registrations, volunteers, eventTypeBreakdown)
    */
   async getCoordinatorStats() {
     try {
@@ -128,8 +154,8 @@ export const eventService = {
   },
 
   // Legacy alias for backward compatibility
-  getEvents() {
-    return this.getAllEvents();
+  getEvents(filters = {}) {
+    return this.getAllEvents(filters);
   },
 
   // Legacy alias

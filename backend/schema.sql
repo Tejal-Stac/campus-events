@@ -105,3 +105,10 @@ CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON public.events FOR EACH 
 UPDATE events 
 SET organising_club = (SELECT organising_club FROM users WHERE id = 9)
 WHERE title = 'AI Summit 2026';
+
+-- 7. Add Non-VITian Student Support
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS college_type VARCHAR(20) DEFAULT 'vitian' CHECK (college_type IN ('vitian', 'non_vitian')),
+  ADD COLUMN IF NOT EXISTS college_name VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS college_email VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT TRUE;

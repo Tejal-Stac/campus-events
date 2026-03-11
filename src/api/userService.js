@@ -20,7 +20,6 @@ export const userService = {
 
   /**
    * Get user's registered events
-   * NOTE: This endpoint needs to be created in backend
    */
   async getMyRegistrations() {
     try {
@@ -67,6 +66,48 @@ export const userService = {
       return response.data;
     } catch (error) {
       console.error('Error updating user role:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get pending non-VITian approvals (coordinator only)
+   * Endpoint: GET /events/coordinator/pending-approvals
+   */
+  async getPendingApprovals() {
+    try {
+      const response = await api.get('/events/coordinator/pending-approvals');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching pending approvals:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Approve a non-VITian student (coordinator only)
+   * Endpoint: PUT /events/coordinator/approve/:userId
+   */
+  async approveUser(userId) {
+    try {
+      const response = await api.put(`/events/coordinator/approve/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error approving user:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Reject (delete) a non-VITian student (coordinator only)
+   * Endpoint: DELETE /events/coordinator/reject/:userId
+   */
+  async rejectUser(userId) {
+    try {
+      const response = await api.delete(`/events/coordinator/reject/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error rejecting user:', error);
       throw error;
     }
   },

@@ -1,274 +1,217 @@
-import { Link } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { useAuth } from '../context/AuthContext'
-import userService from '../api/userService'
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import eventService from "../api/eventService";
+import userService from "../api/userService";
+import Navbar from "../components/Navbar";
+
+const EVENT_TYPE_STYLES = {
+  National:      "bg-red-100 text-red-700",
+  Intercollege:  "bg-purple-100 text-purple-700",
+  Intracollege:  "bg-blue-100 text-blue-700",
+  Department:    "bg-green-100 text-green-700",
+};
+const EVENT_TYPE_ICONS = {
+  National: "🏆", Intercollege: "🎓", Intracollege: "🏫", Department: "📚",
+};
+const EVENT_TYPES = ["All", "National", "Intercollege", "Intracollege", "Department"];
 
 export default function StudentDashboard() {
-  const { user } = useAuth()
-  const [student, setStudent] = useState(null)
-  const [upcomingEvents, setUpcomingEvents] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [events, setEvents] = useState([]);
+  const [myRegistrations, setMyRegistrations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedType, setSelectedType] = useState("All");
+
+  // Role guard
+  useEffect(() => {
+    if (user && user.role !== "student") {
+      navigate(`/${user.role}-dashboard`, { replace: true });
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
+    fetchData();
+  }, []);
 
-  const fetchDashboardData = async () => {
+  const fetchData = async () => {
     try {
-      setLoading(true)
-      // Fetch user profile from PostgreSQL
-      const profile = await userService.getProfile()
-      setStudent(profile)
-      
-      // Fetch user's registered events from PostgreSQL
-      const registrations = await userService.getMyRegistrations()
-      
-      // CRITICAL FIX: Filter for approved events only and upcoming dates
-      const now = new Date()
-      const upcoming = (registrations || []).filter(event => {
-        const eventDate = new Date(event.date || event.event_date)
-        const isUpcoming = eventDate >= now
-        const isApproved = event.status === 'approved' || event.status === 'Active'
-        return isUpcoming && isApproved
-      })
-      
-      console.log(`📊 Student Dashboard: ${registrations?.length || 0} total registrations, ${upcoming.length} approved & upcoming`)
-      setUpcomingEvents(upcoming)
-      setError(null)
+      const [eventsData, regsData] = await Promise.all([
+        eventService.getAllEvents(),
+        userService.getMyRegistrations()
+      ]);
+      setEvents(eventsData);
+      setMyRegistrations((regsData || []).map(r => r.event_id));
     } catch (err) {
-      console.error('Error fetching dashboard data:', err)
-      setError('Failed to load dashboard data')
+      console.error(err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  if (loading) {
-    return (
-      <div style={{ background: '#f0f4ff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '56px' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-          <p style={{ color: '#1a3a6b', fontSize: '16px', fontWeight: '600' }}>Loading your dashboard...</p>
-        </div>
-      </div>
-    )
-  }
+  const filteredEvents = selectedType === "All"
+    ? events
+    : events.filter(e => e.event_type === selectedType);
 
-  if (error) {
-    return (
-      <div style={{ background: '#f0f4ff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '56px' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>❌</div>
-          <p style={{ color: '#dc2626', fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>{error}</p>
-          <button onClick={fetchDashboardData} style={{ background: '#2563eb', color: '#fff', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600' }}>
-            Retry
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const registeredEvents = events.filter(e => myRegistrations.includes(e.id));
+  const upcomingCount = events.filter(e => new Date(e.date) > new Date()).length;
 
-  if (!student) {
-    return (
-      <div style={{ background: '#f0f4ff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '56px' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-          <p style={{ color: '#1a3a6b', fontSize: '16px', fontWeight: '600' }}>Please log in to view your dashboard</p>
-        </div>
-      </div>
-    )
-  }
-
-  const getInitials = (name) => {
-    if (!name) return 'NA'
-    const parts = name.split(' ')
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    }
-    return name.substring(0, 2).toUpperCase()
-  }
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
-
-  const aiSuggestions = [
-    { title: 'Robotics Competition', match: '94%', reason: 'Based on your tech event history' },
-    { title: 'Industry Connect – CSE', match: '88%', reason: 'Matches your branch & year' },
-    { title: 'Finance & Startup Summit', match: '76%', reason: 'Similar seminars attended' },
-  ]
-
-  const skills = ['Python', 'Machine Learning', 'C++', 'Problem Solving', 'Leadership', 'Coordination', 'Teamwork', 'Public Speaking']
+  const typeCounts = EVENT_TYPES.slice(1).reduce((acc, type) => {
+    acc[type] = registeredEvents.filter(e => e.event_type === type).length;
+    return acc;
+  }, {});
 
   return (
-    <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <div className="max-w-7xl mx-auto px-4 py-8">
 
-      {/* Student Info Bar */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #dbeafe', padding: '10px 24px', marginTop: '56px', display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#1a3a6b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '16px' }}>
-            {getInitials(student?.name || `${student?.firstName} ${student?.lastName}`)}
-          </div>
-          <div>
-            <p style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '15px' }}>
-              {student?.name || `${student?.firstName || ''} ${student?.lastName || ''}`.trim() || 'Student'}
-            </p>
-            <span style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '20px', fontSize: '11px', padding: '2px 10px', fontWeight: '600' }}>● Active</span>
-          </div>
+        {/* Welcome Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-800">
+            Welcome back, {user?.name?.split(" ")[0] || user?.firstName} 👋
+          </h1>
+          <p className="text-gray-500 mt-1">
+            {user?.is_vitian
+              ? `${user?.department || "VIT"} · ${user?.year || ""}`
+              : `${user?.college_name || "External Student"}`}
+          </p>
         </div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>Email: <strong style={{ color: '#1a3a6b' }}>{student?.email || 'N/A'}</strong></div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>GR No: <strong style={{ color: '#1a3a6b' }}>{student?.grNumber || 'N/A'}</strong></div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>Dept: <strong style={{ color: '#1a3a6b' }}>{student?.department || 'N/A'}</strong></div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>Points: <strong style={{ color: '#1a3a6b' }}>{student?.points || 0}</strong></div>
-      </div>
-
-      {/* Breadcrumb */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '8px 24px' }}>
-        <p style={{ color: '#64748b', fontSize: '13px' }}>🏠 Home / <span style={{ color: '#1a3a6b', fontWeight: '600' }}>Dashboard</span></p>
-      </div>
-
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
 
         {/* Stats Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
-          {[
-            { label: 'Events Registered', value: upcomingEvents?.length || 0, icon: '🎯', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
-            { label: 'Certificates', value: 0, icon: '📜', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
-            { label: 'Skills Gained', value: skills.length, icon: '💡', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
-            { label: 'Points Earned', value: student?.points || 0, icon: '⭐', bg: '#fdf4ff', color: '#7e22ce', border: '#e9d5ff' },
-          ].map(s => (
-            <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: '12px', textAlign: 'center', padding: '20px' }}>
-              <div style={{ fontSize: '28px', marginBottom: '4px' }}>{s.icon}</div>
-              <div style={{ color: s.color, fontSize: '28px', fontWeight: '700' }}>{s.value}</div>
-              <div style={{ color: '#64748b', fontSize: '12px' }}>{s.label}</div>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <StatCard label="Total Points" value={user?.points || 0} icon="⭐" color="bg-yellow-50 border-yellow-200" />
+          <StatCard label="Registered" value={registeredEvents.length} icon="📋" color="bg-blue-50 border-blue-200" />
+          <StatCard label="Upcoming" value={upcomingCount} icon="📅" color="bg-purple-50 border-purple-200" />
+          <StatCard label="Certificates" value={0} icon="🏅" color="bg-green-50 border-green-200" />
         </div>
 
-        {/* Main Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
-
-          {/* Left Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-            {/* Quick Links */}
-            <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-              <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '16px', fontSize: '16px' }}>⚡ Quick Access</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                {[
-                  { icon: '📅', label: 'Browse Events', to: '/events', bg: '#eff6ff' },
-                  { icon: '📜', label: 'My Certificates', to: '/certificates', bg: '#f0fdf4' },
-                  { icon: '👤', label: 'My Profile', to: '/profile', bg: '#fdf4ff' },
-                  { icon: '🤝', label: 'Find Team', to: '/team-building', bg: '#fff7ed' },
-                  { icon: '🏆', label: 'Leaderboard', to: '/dashboard', bg: '#fffbeb' },
-                  { icon: '🔔', label: 'Reminders', to: '/dashboard', bg: '#fef2f2' },
-                ].map(q => (
-                  <Link key={q.label} to={q.to}
-                    style={{ background: q.bg, border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 12px', textAlign: 'center', textDecoration: 'none', display: 'block', transition: 'all 0.2s' }}
-                    onMouseOver={e => { e.currentTarget.style.borderColor = '#1a3a6b'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-                    onMouseOut={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'translateY(0)' }}>
-                    <div style={{ fontSize: '28px', marginBottom: '8px' }}>{q.icon}</div>
-                    <p style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '600' }}>{q.label}</p>
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            {/* Upcoming Events */}
-            <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px' }}>📅 Upcoming Events</h2>
-                <Link to="/events" style={{ color: '#2563eb', fontSize: '12px', textDecoration: 'none' }}>View all →</Link>
-              </div>
-              {upcomingEvents?.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
-                  <p style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>No approved events yet</p>
-                  <p style={{ fontSize: '12px' }}>Events approved by Dean will appear here</p>
-                  <Link to="/events" style={{ display: 'inline-block', marginTop: '16px', background: '#2563eb', color: '#fff', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontSize: '12px' }}>Browse Events</Link>
+        {/* Event Type Summary Cards */}
+        <div className="mb-8">
+          <h2 className="text-lg font-bold text-gray-700 mb-3">My Participation by Event Type</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {EVENT_TYPES.slice(1).map(type => (
+              <button
+                key={type}
+                onClick={() => setSelectedType(type === selectedType ? "All" : type)}
+                className={`flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all
+                  ${selectedType === type
+                    ? "border-indigo-400 bg-indigo-50 shadow-sm"
+                    : "border-gray-100 bg-white hover:border-indigo-200"}`}
+              >
+                <span className="text-2xl">{EVENT_TYPE_ICONS[type]}</span>
+                <div>
+                  <p className="text-xs text-gray-500">{type}</p>
+                  <p className="text-xl font-bold text-gray-800">{typeCounts[type]}</p>
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {upcomingEvents.map(e => (
-                    <div key={e.id} style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ background: '#dbeafe', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>🎫</div>
-                        <div>
-                          <p style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '600' }}>{e.title}</p>
-                          <p style={{ color: '#64748b', fontSize: '12px' }}>{e.date ? formatDate(e.date) : 'TBD'} · {e.category || 'Event'}</p>
-                        </div>
-                      </div>
-                      <span style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '6px', fontSize: '11px', padding: '3px 10px', fontWeight: '600' }}>Approved</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Participation History */}
-            <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-              <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px', marginBottom: '16px' }}>🏆 Participation History</h2>
-              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📅</div>
-                <p style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Coming Soon</p>
-                <p style={{ fontSize: '12px' }}>Past event participation will appear here</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-            {/* AI Suggestions */}
-            <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-              <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px', marginBottom: '4px' }}>🤖 AI Recommendations</h2>
-              <p style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '16px' }}>Based on your profile & history</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {aiSuggestions.map(s => (
-                  <div key={s.title} style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '12px', cursor: 'pointer' }}
-                    onMouseOver={e => e.currentTarget.style.borderColor = '#1a3a6b'}
-                    onMouseOut={e => e.currentTarget.style.borderColor = '#dbeafe'}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                      <p style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '600' }}>{s.title}</p>
-                      <span style={{ background: '#dbeafe', color: '#1d4ed8', borderRadius: '6px', fontSize: '10px', padding: '2px 6px', flexShrink: 0, marginLeft: '8px', fontWeight: '700' }}>{s.match}</span>
-                    </div>
-                    <p style={{ color: '#64748b', fontSize: '11px' }}>{s.reason}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Skills */}
-            <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-              <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px', marginBottom: '16px' }}>💡 Skills Gained</h2>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {skills.map(s => (
-                  <span key={s} style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '20px', fontSize: '12px', padding: '4px 12px', fontWeight: '500' }}>{s}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* Search */}
-            <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-              <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px', marginBottom: '12px' }}>🔍 Search Events</h2>
-              <div style={{ position: 'relative' }}>
-                <input placeholder="Search events..."
-                  style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 40px 10px 14px', fontSize: '13px', outline: 'none', color: '#1a3a6b', boxSizing: 'border-box' }}
-                  onFocus={e => e.target.style.borderColor = '#1a3a6b'}
-                  onBlur={e => e.target.style.borderColor = '#cbd5e1'} />
-                <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
-              </div>
-            </div>
-
+              </button>
+            ))}
           </div>
         </div>
-      </div>
 
-      <div style={{ background: '#1a3a6b', color: '#93c5fd', textAlign: 'center', padding: '16px', fontSize: '12px', marginTop: '32px' }}>
-        Powered by <strong style={{ color: '#fff' }}>CampusEvents</strong> · Vishwakarma Institute of Technology, Pune
+        {/* Upcoming Events Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-700">Upcoming Events</h2>
+            <button
+              onClick={() => navigate("/events")}
+              className="text-sm text-blue-600 hover:underline font-medium"
+            >
+              View All →
+            </button>
+          </div>
+
+          {/* Type Filter Pills */}
+          <div className="flex flex-wrap gap-2 mb-5">
+            {EVENT_TYPES.map(type => (
+              <button
+                key={type}
+                onClick={() => setSelectedType(type)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all
+                  ${selectedType === type
+                    ? "bg-indigo-600 text-white"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+              >
+                {type !== "All" && EVENT_TYPE_ICONS[type]} {type}
+              </button>
+            ))}
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+            </div>
+          ) : filteredEvents.length === 0 ? (
+            <p className="text-center text-gray-400 py-10">No events found for this type</p>
+          ) : (
+            <div className="space-y-3">
+              {filteredEvents.slice(0, 6).map(event => (
+                <EventRow
+                  key={event.id}
+                  event={event}
+                  isRegistered={myRegistrations.includes(event.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* My Registered Events */}
+        {registeredEvents.length > 0 && (
+          <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h2 className="text-lg font-bold text-gray-700 mb-4">My Registered Events</h2>
+            <div className="space-y-3">
+              {registeredEvents.map(event => (
+                <EventRow key={event.id} event={event} isRegistered={true} />
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
-  )
+  );
+}
+
+function StatCard({ label, value, icon, color }) {
+  return (
+    <div className={`rounded-xl border p-4 ${color}`}>
+      <div className="text-2xl mb-1">{icon}</div>
+      <div className="text-2xl font-bold text-gray-800">{value}</div>
+      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+function EventRow({ event, isRegistered }) {
+  const formatDate = (d) =>
+    new Date(d).toLocaleDateString("en-IN", {
+      day: "numeric", month: "short", year: "numeric"
+    });
+
+  return (
+    <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-lg">
+          {EVENT_TYPE_ICONS[event.event_type] || "📌"}
+        </div>
+        <div>
+          <p className="font-semibold text-gray-800 text-sm">{event.title}</p>
+          <p className="text-xs text-gray-400">{formatDate(event.date)} · {event.location}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${EVENT_TYPE_STYLES[event.event_type] || ""}`}>
+          {event.event_type}
+        </span>
+        {isRegistered && (
+          <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">
+            ✅ Registered
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }

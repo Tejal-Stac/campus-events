@@ -7,7 +7,8 @@ const register = async (req, res) => {
   const {
     firstName, lastName, email, password,
     role, department, division, year,
-    grNumber, campus, phone, designation, interests
+    grNumber, campus, phone, designation, interests,
+    college_name, college_email
   } = req.body
 
   try {
@@ -20,22 +21,42 @@ const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Dean Role Logic: If role is 'faculty' and designation is 'Dean', upgrade to 'dean'
+    // Dean Role Logic
     let finalRole = role
     if (role === 'faculty' && designation && designation.toLowerCase() === 'dean') {
       finalRole = 'dean'
     }
 
+    // Non-VITian detection
+    const isVitian = email.endsWith('@vit.edu')
+    const userCollegeType = isVitian ? 'vitian' : 'non_vitian'
+    const isApproved = isVitian
+
+    if (!isVitian && !college_name) {
+      return res.status(400).json({ message: 'College name is required for non-VIT students' })
+    }
+
     const result = await pool.query(
       `INSERT INTO users 
         (first_name, last_name, email, password, role, department, 
-         division, year, gr_number, campus, phone, designation, interests)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-       RETURNING id, first_name, last_name, email, role, campus, department, gr_number, designation`,
+         division, year, gr_number, campus, phone, designation, interests,
+         college_type, college_name, college_email, is_approved)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+       RETURNING id, first_name, last_name, email, role, campus, department, gr_number, designation, is_approved`,
       [firstName, lastName, email, hashedPassword, finalRole, department,
        division, year, grNumber, campus, phone, designation,
-       JSON.stringify(interests || [])]
+       JSON.stringify(interests || []),
+       userCollegeType, college_name || null, college_email || null, isApproved]
     )
+
+    // Block non-VITians from getting token until approved
+    if (!result.rows[0].is_approved) {
+      return res.status(201).json({
+        success: true,
+        pending: true,
+        message: 'Registration submitted! Awaiting coordinator approval.'
+      })
+    }
 
     const userResponse = {
       id: result.rows[0].id,
@@ -77,6 +98,13 @@ const login = async (req, res) => {
 
     const user = result.rows[0]
 
+    // Block unapproved non-VITians
+    if (user.is_approved === false) {
+      return res.status(403).json({
+        message: 'Your account is pending coordinator approval.'
+      })
+    }
+
     const isMatch = await bcrypt.compare(password, user.password)
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid password' })
@@ -87,11 +115,10 @@ const login = async (req, res) => {
       return res.status(400).json({ message: 'You are not registered as ' + role })
     }
 
-    // Standardized user object for frontend
     const userResponse = {
       id: user.id,
       email: user.email,
-      role: userRole, // Always use 'role' key (mapped from assigned_role if needed)
+      role: userRole,
       firstName: user.first_name,
       lastName: user.last_name,
       campus: user.campus,
@@ -120,14 +147,13 @@ const login = async (req, res) => {
   }
 }
 
-
-// Get current user's profile (full data)
 const getProfile = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT u1.id, u1.first_name, u1.last_name, u1.email, u1.role, u1.assigned_role, 
               u1.department, u1.division, u1.year, u1.gr_number, u1.campus, u1.phone, 
               u1.designation, u1.interests, u1.created_at,
+              u1.college_type, u1.college_name,
               (u2.first_name || ' ' || u2.last_name) AS promoted_by_name
        FROM users u1
        LEFT JOIN users u2 ON u1.promoted_by = u2.id
@@ -142,7 +168,6 @@ const getProfile = async (req, res) => {
     const user = result.rows[0]
     const userRole = user.assigned_role || user.role
 
-    // Format response with camelCase for frontend
     const userResponse = {
       id: user.id,
       email: user.email,
@@ -159,7 +184,9 @@ const getProfile = async (req, res) => {
       designation: user.designation,
       interests: user.interests,
       promotedByName: user.promoted_by_name,
-      points: 0, // TODO: Calculate from events/activities
+      collegeType: user.college_type,
+      collegeName: user.college_name,
+      points: 0,
       createdAt: user.created_at
     }
 
