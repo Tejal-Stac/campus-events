@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { deanService } from '../api/deanService'
 import { eventService } from '../api/eventService'
 import axios from 'axios'
+import EventCard from '../components/EventCard'
 
 export default function DeanDashboard() {
   const { user, logout } = useAuth()
@@ -66,7 +67,7 @@ export default function DeanDashboard() {
   }
 
   // Approve event handler
-  const handleApproveEvent = async (eventId) => {
+  const handleApproveEvent = async (eventId, remarks = '') => {
     if (!window.confirm('Approve this event?')) return
     
     try {
@@ -80,7 +81,7 @@ export default function DeanDashboard() {
   }
 
   // Reject event handler
-  const handleRejectEvent = async (eventId) => {
+  const handleRejectEvent = async (eventId, remarks = '') => {
     if (!window.confirm('Reject this event? This cannot be undone.')) return
     
     try {
@@ -90,6 +91,15 @@ export default function DeanDashboard() {
     } catch (err) {
       console.error('Error rejecting event:', err)
       alert('Failed to reject event: ' + (err.response?.data?.message || err.message))
+    }
+  }
+
+  // Handle EventCard actions (approve/reject)
+  const handleAction = (action, eventId, remarks = '') => {
+    if (action === 'approve') {
+      handleApproveEvent(eventId, remarks)
+    } else if (action === 'reject') {
+      handleRejectEvent(eventId, remarks)
     }
   }
 
@@ -416,45 +426,14 @@ export default function DeanDashboard() {
                   <p style={{ fontSize: '14px', fontWeight: '600' }}>No pending events</p>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {events?.filter(e => e.status === 'pending').map(event => (
-                    <div key={event.id} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <div style={{ flex: 1 }}>
-                          <h4 style={{ color: '#1a3a6b', fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>{event.title}</h4>
-                          <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '8px' }}>
-                            📅 {new Date(event.date).toLocaleDateString()} · 📍 {event.venue} · 🎯 {event.organising_club || event.organisingClub || 'N/A'}
-                          </p>
-                          <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: '#64748b' }}>
-                            <span>⏰ {event.time_from || event.timeFrom || 'TBA'} - {event.time_to || event.timeTo || 'TBA'}</span>
-                            <span>👥 {event.seats || 0} seats</span>
-                            <span>💰 {event.fees || 'Free'}</span>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                          <button 
-                            onClick={() => handleApproveEvent(event.id)}
-                            style={{ 
-                              background: '#16a34a', color: '#fff', border: 'none', 
-                              borderRadius: '8px', padding: '8px 16px', fontSize: '12px', 
-                              cursor: 'pointer', fontWeight: '600', whiteSpace: 'nowrap' 
-                            }}
-                          >
-                            ✅ Approve
-                          </button>
-                          <button 
-                            onClick={() => handleRejectEvent(event.id)}
-                            style={{ 
-                              background: '#dc2626', color: '#fff', border: 'none', 
-                              borderRadius: '8px', padding: '8px 16px', fontSize: '12px', 
-                              cursor: 'pointer', fontWeight: '600', whiteSpace: 'nowrap' 
-                            }}
-                          >
-                            ❌ Reject
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      role="dean"
+                      onAction={handleAction}
+                    />
                   ))}
                 </div>
               )}
@@ -468,15 +447,13 @@ export default function DeanDashboard() {
                   <p style={{ fontSize: '12px' }}>No approved events yet</p>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {events?.filter(e => e.status === 'approved' || e.status === 'Active').slice(0, 6).map(event => (
-                    <div key={event.id} style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px' }}>
-                      <h4 style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>{event.title}</h4>
-                      <p style={{ color: '#64748b', fontSize: '11px' }}>📅 {new Date(event.date).toLocaleDateString()} · 📍 {event.venue}</p>
-                      <span style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '6px', fontSize: '10px', padding: '2px 8px', fontWeight: '600', display: 'inline-block', marginTop: '8px' }}>
-                        ✅ Approved
-                      </span>
-                    </div>
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      role="view"
+                    />
                   ))}
                 </div>
               )}
@@ -486,17 +463,13 @@ export default function DeanDashboard() {
             {events?.filter(e => e.status === 'rejected').length > 0 && (
               <div>
                 <h3 style={{ color: '#1a3a6b', fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>❌ Rejected Events ({events?.filter(e => e.status === 'rejected').length || 0})</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {events?.filter(e => e.status === 'rejected').map(event => (
-                    <div key={event.id} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <h4 style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '700' }}>{event.title}</h4>
-                        <p style={{ color: '#64748b', fontSize: '11px' }}>📅 {new Date(event.date).toLocaleDateString()}</p>
-                      </div>
-                      <span style={{ background: '#fee2e2', color: '#dc2626', borderRadius: '6px', fontSize: '10px', padding: '2px 8px', fontWeight: '600' }}>
-                        ❌ Rejected
-                      </span>
-                    </div>
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      role="view"
+                    />
                   ))}
                 </div>
               </div>
