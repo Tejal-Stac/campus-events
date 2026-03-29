@@ -5,10 +5,10 @@ import eventService from "../api/eventService";
 import Navbar from "../components/Navbar";
 
 const EVENT_TYPE_STYLES = {
-  National:      "bg-red-100 text-red-700",
-  Intercollege:  "bg-purple-100 text-purple-700",
-  Intracollege:  "bg-blue-100 text-blue-700",
-  Department:    "bg-green-100 text-green-700",
+  National:     "bg-red-100 text-red-700 border-red-200",
+  Intercollege: "bg-purple-100 text-purple-700 border-purple-200",
+  Intracollege: "bg-blue-100 text-blue-700 border-blue-200",
+  Department:   "bg-green-100 text-green-700 border-green-200",
 };
 const EVENT_TYPE_ICONS = {
   National: "🏆", Intercollege: "🎓", Intracollege: "🏫", Department: "📚",
@@ -24,7 +24,6 @@ export default function FacultyDashboard() {
   const [selectedType, setSelectedType] = useState("All");
   const [selectedCategory, setSelectedCategory] = useState("All");
 
-  // Role guard
   useEffect(() => {
     if (user && user.role !== "faculty") {
       navigate(`/${user.role}-dashboard`, { replace: true });
@@ -51,6 +50,7 @@ export default function FacultyDashboard() {
     style: EVENT_TYPE_STYLES[type],
   }));
 
+  // ✅ NaN guard
   const totalRegistrations = events.reduce((s, e) => s + (e.registered_count || 0), 0);
 
   return (
@@ -62,36 +62,32 @@ export default function FacultyDashboard() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Faculty Dashboard</h1>
           <p className="text-gray-500 mt-1">
-            {user?.designation || "Faculty"} · {user?.department || ""}
+            {user?.designation || "Faculty"}{user?.department ? " · " + user.department : ""}
           </p>
         </div>
 
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard label="Total Events" value={events.length} icon="📅" color="bg-blue-50 border-blue-200" />
-          <StatCard label="Total Registrations" value={totalRegistrations} icon="👥" color="bg-indigo-50 border-indigo-200" />
-          <StatCard label="Active Events" value={events.filter(e => e.status === "active").length} icon="✅" color="bg-green-50 border-green-200" />
-          <StatCard label="Upcoming" value={events.filter(e => new Date(e.date) > new Date()).length} icon="🔜" color="bg-purple-50 border-purple-200" />
+          <StatCard label="Total Events"        value={events.length}             icon="📅" color="bg-blue-50 border-blue-200" />
+          <StatCard label="Total Registrations" value={totalRegistrations}         icon="👥" color="bg-indigo-50 border-indigo-200" />
+          <StatCard label="Active Events"       value={events.filter(e => e.status === "Active" || e.status === "active").length} icon="✅" color="bg-green-50 border-green-200" />
+          <StatCard label="Upcoming"            value={events.filter(e => new Date(e.date) > new Date()).length} icon="📌" color="bg-purple-50 border-purple-200" />
         </div>
 
-        {/* Event Type Breakdown */}
+        {/* ✅ Event Type Breakdown — clickable filter cards */}
         <div className="mb-8">
           <h2 className="text-lg font-bold text-gray-700 mb-3">Events by Type</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {typeStats.map(({ type, count, icon, style }) => (
-              <button
-                key={type}
+              <button key={type}
                 onClick={() => setSelectedType(selectedType === type ? "All" : type)}
                 className={`p-4 rounded-xl border-2 text-left transition-all
                   ${selectedType === type
                     ? "border-indigo-400 bg-indigo-50 shadow-sm"
-                    : "border-gray-100 bg-white hover:border-indigo-200"}`}
-              >
+                    : "border-gray-100 bg-white hover:border-indigo-200 hover:shadow-sm"}`}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xl">{icon}</span>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${style}`}>
-                    {type}
-                  </span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${style}`}>{type}</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-800">{count}</p>
                 <p className="text-xs text-gray-400 mt-0.5">events</p>
@@ -104,16 +100,14 @@ export default function FacultyDashboard() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
             <h2 className="text-lg font-bold text-gray-700">All Campus Events</h2>
+            {/* ✅ Filter pills */}
             <div className="flex flex-wrap gap-2">
               {EVENT_TYPES.map(type => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedType(type)}
+                <button key={type} onClick={() => setSelectedType(type)}
                   className={`px-3 py-1 rounded-full text-xs font-semibold transition-all
                     ${selectedType === type
                       ? "bg-indigo-600 text-white"
-                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
-                >
+                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
                   {type !== "All" && EVENT_TYPE_ICONS[type]} {type}
                 </button>
               ))}
@@ -140,50 +134,61 @@ export default function FacultyDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEvents.map(event => (
-                    <tr key={event.id} className="border-b border-gray-50 hover:bg-gray-50 transition">
-                      <td className="py-3 px-2">
-                        <p className="font-semibold text-gray-800">{event.title}</p>
-                        <p className="text-xs text-gray-400">{event.location}</p>
-                      </td>
-                      <td className="py-3 px-2">
-                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${EVENT_TYPE_STYLES[event.event_type] || ""}`}>
-                          {EVENT_TYPE_ICONS[event.event_type]} {event.event_type}
-                        </span>
-                      </td>
-                      <td className="py-3 px-2">
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-medium">
-                          {event.category}
-                        </span>
-                      </td>
-                      <td className="py-3 px-2 text-gray-600">
-                        {new Date(event.date).toLocaleDateString("en-IN", {
-                          day: "numeric", month: "short", year: "numeric"
-                        })}
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 bg-gray-100 rounded-full h-1.5">
-                            <div
-                              className="h-1.5 rounded-full bg-blue-500"
-                              style={{ width: `${Math.min((event.registered_count / event.max_participants) * 100, 100)}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-gray-500">
-                            {event.registered_count}/{event.max_participants}
+                  {filteredEvents.map(event => {
+                    const regCount = event.registered_count || 0;
+                    const maxPart  = event.max_participants || event.seats || 100;
+                    const pct      = Math.min((regCount / maxPart) * 100, 100);
+
+                    return (
+                      <tr key={event.id} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td className="py-3 px-2">
+                          <p className="font-semibold text-gray-800">{event.title}</p>
+                          <p className="text-xs text-gray-400">{event.location || event.venue || "—"}</p>
+                        </td>
+                        <td className="py-3 px-2">
+                          {event.event_type ? (
+                            <span className={`text-xs font-bold px-2 py-1 rounded-full border ${EVENT_TYPE_STYLES[event.event_type] || "bg-gray-100 text-gray-500 border-gray-200"}`}>
+                              {EVENT_TYPE_ICONS[event.event_type]} {event.event_type}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2">
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-medium">
+                            {event.category || "—"}
                           </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-2">
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full
-                          ${event.status === "active"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-500"}`}>
-                          {event.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-3 px-2 text-gray-600 text-xs">
+                          {new Date(event.date).toLocaleDateString("en-IN", {
+                            day: "numeric", month: "short", year: "numeric"
+                          })}
+                        </td>
+                        <td className="py-3 px-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 bg-gray-100 rounded-full h-1.5">
+                              <div className="h-1.5 rounded-full bg-blue-500"
+                                style={{ width: `${pct}%` }} />
+                            </div>
+                            {/* ✅ NaN guard */}
+                            <span className="text-xs text-gray-500">{regCount}/{maxPart}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-2">
+                          <span className={`text-xs font-semibold px-2 py-1 rounded-full
+                            ${event.status === "Active" || event.status === "active"
+                              ? "bg-green-100 text-green-700"
+                              : event.status === "pending"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : event.status === "approved"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-gray-100 text-gray-500"}`}>
+                            {event.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

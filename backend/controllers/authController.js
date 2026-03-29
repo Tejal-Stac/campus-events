@@ -37,12 +37,13 @@ const register = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO users 
-        (first_name, last_name, email, password, role, department, 
+      `INSERT INTO users
+        (first_name, last_name, email, password, role, department,
          division, year, gr_number, campus, phone, designation, interests,
          college_type, college_name, college_email, is_approved)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-       RETURNING id, first_name, last_name, email, role, campus, department, gr_number, designation, is_approved`,
+       RETURNING id, first_name, last_name, email, role, campus, department,
+                 gr_number, designation, is_approved, college_type, college_name`,
       [firstName, lastName, email, hashedPassword, finalRole, department,
        division, year, grNumber, campus, phone, designation,
        JSON.stringify(interests || []),
@@ -67,7 +68,11 @@ const register = async (req, res) => {
       campus: result.rows[0].campus,
       department: result.rows[0].department,
       grNumber: result.rows[0].gr_number,
-      designation: result.rows[0].designation
+      designation: result.rows[0].designation,
+      // ✅ FIX: include college info so frontend knows if user is VITian
+      college_type: result.rows[0].college_type,
+      college_name: result.rows[0].college_name,
+      is_vitian: result.rows[0].college_type === 'vitian',
     }
 
     console.log('✅ Registration successful for:', userResponse.email, '| Role:', userResponse.role)
@@ -115,6 +120,10 @@ const login = async (req, res) => {
       return res.status(400).json({ message: 'You are not registered as ' + role })
     }
 
+    // ✅ FIX: derive is_vitian from college_type column
+    // Falls back to checking email if college_type not yet set (for old accounts)
+    const collegeType = user.college_type || (user.email.endsWith('@vit.edu') ? 'vitian' : 'non_vitian')
+
     const userResponse = {
       id: user.id,
       email: user.email,
@@ -124,7 +133,11 @@ const login = async (req, res) => {
       campus: user.campus,
       department: user.department,
       grNumber: user.gr_number,
-      designation: user.designation
+      designation: user.designation,
+      // ✅ FIX: these fields now included so Events.jsx isVITOnly works correctly
+      college_type: collegeType,
+      college_name: user.college_name || null,
+      is_vitian: collegeType === 'vitian',
     }
 
     const token = jwt.sign(
@@ -133,7 +146,7 @@ const login = async (req, res) => {
       { expiresIn: '7d' }
     )
 
-    console.log('✅ Login successful for:', userResponse.email, '| Role:', userResponse.role)
+    console.log('✅ Login successful for:', userResponse.email, '| Role:', userResponse.role, '| VITian:', userResponse.is_vitian)
 
     res.json({
       success: true,
@@ -150,8 +163,8 @@ const login = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u1.id, u1.first_name, u1.last_name, u1.email, u1.role, u1.assigned_role, 
-              u1.department, u1.division, u1.year, u1.gr_number, u1.campus, u1.phone, 
+      `SELECT u1.id, u1.first_name, u1.last_name, u1.email, u1.role, u1.assigned_role,
+              u1.department, u1.division, u1.year, u1.gr_number, u1.campus, u1.phone,
               u1.designation, u1.interests, u1.created_at,
               u1.college_type, u1.college_name,
               (u2.first_name || ' ' || u2.last_name) AS promoted_by_name
@@ -167,6 +180,7 @@ const getProfile = async (req, res) => {
 
     const user = result.rows[0]
     const userRole = user.assigned_role || user.role
+    const collegeType = user.college_type || (user.email.endsWith('@vit.edu') ? 'vitian' : 'non_vitian')
 
     const userResponse = {
       id: user.id,
@@ -184,8 +198,12 @@ const getProfile = async (req, res) => {
       designation: user.designation,
       interests: user.interests,
       promotedByName: user.promoted_by_name,
-      collegeType: user.college_type,
+      collegeType: collegeType,
+      college_type: collegeType,
+      college_name: user.college_name,
       collegeName: user.college_name,
+      // ✅ FIX: is_vitian included in profile too
+      is_vitian: collegeType === 'vitian',
       points: 0,
       createdAt: user.created_at
     }

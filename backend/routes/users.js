@@ -3,42 +3,31 @@ const router = express.Router()
 const pool = require('../config/db')
 const auth = require('../middleware/auth')
 
-// Middleware to check if user is Dean
 const isDean = (req, res, next) => {
   if (req.user.role !== 'dean') {
-    return res.status(403).json({ message: 'Access denied. Dean role required.' })
+    return res.status(403).json({ success: false, message: 'Dean access only' })
   }
   next()
 }
 
-// Get current user's profile
+// GET current user profile
 router.get('/profile', auth, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT u1.id, u1.first_name, u1.last_name, u1.email, u1.role, u1.assigned_role, 
-              u1.department, u1.division, u1.year, u1.gr_number, u1.campus, u1.phone, 
-              u1.designation, u1.interests, u1.organising_club, u1.assigned_event_id, u1.created_at,
-              u1.college_type, u1.college_name,
-              (u2.first_name || ' ' || u2.last_name) AS promoted_by_name
-       FROM users u1
-       LEFT JOIN users u2 ON u1.promoted_by = u2.id
-       WHERE u1.id = $1`,
-      [req.user.id]
-    )
-
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id])
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
-
     const user = result.rows[0]
-    const userRole = user.assigned_role || user.role
-
     const userResponse = {
       id: user.id,
       email: user.email,
-      role: userRole,
+      role: user.role,
+      assignedRole: user.assigned_role,
       firstName: user.first_name,
       lastName: user.last_name,
+      is_vitian: user.is_vitian,
+      college_type: user.college_type,
+      college_name: user.college_name,
       name: `${user.first_name} ${user.last_name}`,
       campus: user.campus,
       department: user.department,
@@ -56,7 +45,6 @@ router.get('/profile', auth, async (req, res) => {
       points: 0,
       createdAt: user.created_at
     }
-
     res.json({ success: true, data: userResponse })
   } catch (err) {
     console.error('GET PROFILE ERROR:', err.message)
@@ -107,11 +95,46 @@ router.patch('/:id/approve', auth, async (req, res) => {
   }
 })
 
-// Get user's registered events
+// GET user's registered events — uses actual DB column names (venue, seats, etc.)
 router.get('/my-registrations', auth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT e.*, r.registered_at, r.status as registration_status
+      `SELECT
+         e.id,
+         e.id          AS event_id,
+         e.title,
+         e.description,
+         e.date,
+         e.day,
+         e.time_from,
+         e.time_to,
+         e.venue,
+         e.event_type,
+         e.category,
+         e.fees,
+         e.seats,
+         e.status,
+         e.organising_club,
+         e.contact,
+         e.sa_vertical,
+         e.key_features,
+         e.online_link,
+         e.target_audience,
+         e.expected_count,
+         e.allow_external,
+         e.payment_qr_url,
+         e.created_at  AS event_created_at,
+         r.id          AS registration_id,
+         r.registered_at,
+         r.status      AS registration_status,
+         r.reg_name,
+         r.reg_department,
+         r.reg_division,
+         r.reg_year,
+         r.reg_gr_number,
+         r.reg_prn,
+         r.reg_phone,
+         r.reg_college_name
        FROM registrations r
        JOIN events e ON r.event_id = e.id
        WHERE r.user_id = $1
@@ -129,9 +152,9 @@ router.get('/my-registrations', auth, async (req, res) => {
 router.get('/students', auth, isDean, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, first_name, last_name, email, role, assigned_role, 
+      `SELECT id, first_name, last_name, email, role, assigned_role,
               department, division, year, gr_number, campus, phone, created_at
-       FROM users 
+       FROM users
        WHERE role = 'student'
        ORDER BY first_name, last_name`
     )
@@ -164,9 +187,9 @@ router.put('/:id/promote', auth, isDean, async (req, res) => {
   const userId = req.params.id
 
   if (!['coordinator', 'volunteer'].includes(assignedRole)) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       success: false,
-      message: 'Invalid role. Can only promote to coordinator or volunteer.' 
+      message: 'Invalid role. Can only promote to coordinator or volunteer.'
     })
   }
 
@@ -179,20 +202,19 @@ router.put('/:id/promote', auth, isDean, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
     if (userCheck.rows[0].role !== 'student') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Can only promote students. User is not a student.' 
+        message: 'Can only promote students. User is not a student.'
       })
     }
     const result = await pool.query(
-      `UPDATE users 
+      `UPDATE users
        SET assigned_role = $1, promoted_by = $2, updated_at = NOW()
-       WHERE id = $3 
+       WHERE id = $3
        RETURNING id, first_name, last_name, email, role, assigned_role`,
       [assignedRole, req.user.id, userId]
     )
     const updatedUser = result.rows[0]
-    console.log(`✅ Dean ${req.user.email} promoted ${updatedUser.first_name} to ${assignedRole}`)
     res.json({
       success: true,
       message: `${updatedUser.first_name} ${updatedUser.last_name} has been promoted to ${assignedRole}!`,
@@ -229,9 +251,9 @@ router.get('/', auth, async (req, res) => {
 router.put('/update-role', auth, async (req, res) => {
   const { userId, role, eventId } = req.body
   if (!['volunteer', 'student'].includes(role)) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       success: false,
-      message: 'Invalid role. Can only set volunteer or student.' 
+      message: 'Invalid role. Can only set volunteer or student.'
     })
   }
   try {
@@ -242,13 +264,12 @@ router.put('/update-role', auth, async (req, res) => {
     if (userCheck.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
-    const updateQuery = eventId 
+    const updateQuery = eventId
       ? 'UPDATE users SET assigned_role = $1, assigned_event_id = $2 WHERE id = $3 RETURNING *'
       : 'UPDATE users SET assigned_role = $1, assigned_event_id = NULL WHERE id = $2 RETURNING *'
     const params = eventId ? [role, eventId, userId] : [role, userId]
     const result = await pool.query(updateQuery, params)
     const updatedUser = result.rows[0]
-    console.log(`✅ User ${updatedUser.first_name} role updated to ${role}`)
     res.json({
       success: true,
       message: `${updatedUser.first_name} ${updatedUser.last_name} is now a ${role}!`,

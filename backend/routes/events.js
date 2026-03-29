@@ -2,14 +2,15 @@ const express = require('express')
 const router = express.Router()
 const PDFDocument = require('pdfkit')
 const pool = require('../config/db')
-const auth = require('../middleware/auth')
-const { isDean, isFacultyOrDean } = require('../middleware/auth')
+const auth = require('../middleware/auth')                    // default export
+const { isDean, isFacultyOrDean } = require('../middleware/auth')  // named exports
+const optionalAuth = require('../middleware/optionalAuth')
 const {
   getAllEvents, getEventById, createEvent,
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,
-  getPendingApprovals, approveNonVitian, rejectNonVitian   // ── NEW ──
+  getPendingApprovals, approveNonVitian, rejectNonVitian
 } = require('../controllers/eventController')
 
 // ─────────────────────────────────────────────────────────────
@@ -17,7 +18,7 @@ const {
 // Otherwise Express matches "coordinator" as an :id param
 // ─────────────────────────────────────────────────────────────
 
-// Public routes (no :id param - safe at top)
+// Public routes
 router.get('/', getAllEvents)
 
 // Coordinator-specific routes (must be before /:id)
@@ -25,7 +26,7 @@ router.get('/coordinator/stats', auth, getCoordinatorStats)
 router.get('/coordinator/volunteers', auth, getCoordinatorVolunteers)
 router.get('/coordinator/pending-approvals', auth, getPendingApprovals)
 router.put('/coordinator/approve/:userId', auth, approveNonVitian)
-router.delete('/coordinator/reject/:userId', auth, rejectNonVitian)   // ── NEW ──
+router.delete('/coordinator/reject/:userId', auth, rejectNonVitian)
 
 // Certificate route (must be before /:id)
 router.get('/generate/:eventId', auth, async (req, res) => {
@@ -134,8 +135,7 @@ router.get('/:id', getEventById)
 router.post('/', auth, isFacultyOrDean, createEvent)
 router.put('/:id/status', auth, isDean, updateEventStatus)
 router.patch('/:id/event-type', auth, updateEventType)
-router.post('/:id/register', auth, registerForEvent)
-router.post('/register/:id', auth, registerForEvent)
+router.post('/:id/register', optionalAuth, registerForEvent)   // ✅ single register route, supports both guest & logged-in
 router.get('/:id/registrations', auth, getEventRegistrations)
 
 module.exports = router

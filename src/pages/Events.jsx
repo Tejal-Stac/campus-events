@@ -1,53 +1,59 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import eventService from "../api/eventService";
 import userService from "../api/userService";
 import Navbar from "../components/Navbar";
+import RegistrationModal from "../components/RegistrationModal";
 
-// Color map for event type badges
 const EVENT_TYPE_STYLES = {
-  National:      "bg-red-100 text-red-700 border border-red-200",
-  Intercollege:  "bg-purple-100 text-purple-700 border border-purple-200",
-  Intracollege:  "bg-blue-100 text-blue-700 border border-blue-200",
-  Department:    "bg-green-100 text-green-700 border border-green-200",
+  National:     "bg-red-100 text-red-700 border border-red-200",
+  Intercollege: "bg-purple-100 text-purple-700 border border-purple-200",
+  Intracollege: "bg-blue-100 text-blue-700 border border-blue-200",
+  Department:   "bg-green-100 text-green-700 border border-green-200",
 };
-
 const EVENT_TYPE_ICONS = {
-  National:     "🏆",
-  Intercollege: "🎓",
-  Intracollege: "🏫",
-  Department:   "📚",
+  National: "🏆", Intercollege: "🎓", Intracollege: "🏫", Department: "📚",
 };
-
 const CATEGORIES = ["All", "Hackathon", "Seminar", "Workshop", "Cultural", "Sports", "Technical"];
 const EVENT_TYPES = ["All", "National", "Intercollege", "Intracollege", "Department"];
 
 export default function Events() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [myRegistrations, setMyRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(null);
   const [alert, setAlert] = useState(null);
-
-  // Filters
+  const [modalEvent, setModalEvent] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedType, setSelectedType] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const userIsVitian = !!(
+    user?.is_vitian ||
+    user?.college_type === "vitian" ||
+    user?.email?.endsWith("@vit.edu")
+  );
+
+  useEffect(() => { fetchData(); }, [user]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [eventsData, regsData] = await Promise.all([
-        eventService.getAllEvents(),
-        userService.getMyRegistrations()
-      ]);
-      setEvents(eventsData);
-      setMyRegistrations((regsData || []).map(r => r.event_id));
+      const eventsData = await eventService.getAllEvents();
+      setEvents(eventsData || []);
+
+      // Only fetch registrations if logged in
+      if (user) {
+        try {
+          const regsData = await userService.getMyRegistrations();
+          setMyRegistrations((regsData || []).map(r => r.event_id || r.id));
+        } catch {
+          setMyRegistrations([]);
+        }
+      }
     } catch (err) {
       console.error(err);
       showAlert("Failed to load events", "error");
@@ -56,19 +62,48 @@ export default function Events() {
     }
   };
 
-  const handleRegister = async (eventId) => {
+  const showAlert = (message, type = "success") => {
+    setAlert({ message, type });
+    setTimeout(() => setAlert(null), 4000);
+  };
+
+  const handleRegisterClick = (event) => {
+    // Logged-in VIT student → normal modal
+    if (user && userIsVitian) {
+      setModalEvent(event);
+      return;
+    }
+    // Logged-in non-VIT user → external modal (if event allows)
+    if (user && !userIsVitian) {
+      if (!event.allow_external) {
+        showAlert("This event is for VIT students only 🔒", "error");
+        return;
+      }
+      setModalEvent(event);
+      return;
+    }
+    // Guest (not logged in) → open modal for external form if allowed, else prompt login
+    if (!event.allow_external) {
+      showAlert("This event is for VIT students only. Please login with your VIT account 🔒", "error");
+      return;
+    }
+    // Guest + allow_external → open modal as guest
+    setModalEvent(event);
+  };
+
+  const handleModalConfirm = async (formData) => {
+    if (!modalEvent) return;
     try {
-      setRegistering(eventId);
-      await eventService.registerForEvent(eventId);
-      setMyRegistrations(prev => [...prev, eventId]);
-      setEvents(prev =>
-        prev.map(e =>
-          e.id === eventId
-            ? { ...e, registered_count: e.registered_count + 1 }
-            : e
-        )
-      );
-      showAlert("🎉 Registered! 100 points added to your account.", "success");
+      setRegistering(modalEvent.id);
+      await eventService.registerForEvent(modalEvent.id, formData);
+      if (user) {
+        // Logged-in: close modal and refresh
+        setModalEvent(null);
+        showAlert("✅ Registered successfully!");
+        setMyRegistrations(prev => [...prev, modalEvent.id]);
+        fetchData();
+      }
+      // Guest: don't close - RegistrationModal shows GuestTicket screen internally
     } catch (err) {
       showAlert(err.response?.data?.message || "Registration failed", "error");
     } finally {
@@ -76,23 +111,59 @@ export default function Events() {
     }
   };
 
-  const showAlert = (message, type) => {
-    setAlert({ message, type });
-    setTimeout(() => setAlert(null), 4000);
+  const isRegistered = (eventId) => myRegistrations.includes(eventId);
+
+  const getRegistrationButton = (event) => {
+    // Already registered (only possible if logged in)
+    if (user && isRegistered(event.id)) {
+      return (
+        <button disabled className="w-full py-2 px-4 rounded-lg font-semibold bg-green-100 text-green-700 cursor-not-allowed text-sm">
+          ✅ Registered
+        </button>
+      );
+    }
+
+    // VIT-only event + guest → show login prompt
+    if (!event.allow_external && !user) {
+      return (
+        <button
+          onClick={() => navigate("/login")}
+          className="w-full py-2 px-4 rounded-lg font-semibold bg-gray-100 text-gray-500 text-sm hover:bg-blue-50 hover:text-blue-600 transition-colors"
+        >
+          🔒 Login to Register
+        </button>
+      );
+    }
+
+    // VIT-only event + non-vitian logged in
+    if (!event.allow_external && user && !userIsVitian) {
+      return (
+        <button disabled className="w-full py-2 px-4 rounded-lg font-semibold bg-gray-100 text-gray-400 cursor-not-allowed text-sm">
+          🔒 VIT Students Only
+        </button>
+      );
+    }
+
+    // Open event OR vitian logged in → Register button
+    return (
+      <button
+        onClick={() => handleRegisterClick(event)}
+        disabled={registering === event.id}
+        className="w-full py-2 px-4 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors text-sm disabled:opacity-60"
+      >
+        {registering === event.id ? "Registering..." : !user ? "🌐 Register as Guest" : "Register Now →"}
+      </button>
+    );
   };
 
-  // Filter logic
   const filteredEvents = events.filter(event => {
-    const matchCategory = selectedCategory === "All" || event.category === selectedCategory;
+    const matchCat = selectedCategory === "All" || event.category === selectedCategory;
     const matchType = selectedType === "All" || event.event_type === selectedType;
-    const matchSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        event.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCategory && matchType && matchSearch;
+    const matchSearch = !searchQuery ||
+      event.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      event.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchCat && matchType && matchSearch;
   });
-
-  const isRegistered = (eventId) => myRegistrations.includes(eventId);
-  const isFull = (event) => event.registered_count >= event.max_participants;
-  const isVITOnly = (event) => !event.allow_external && !user?.is_vitian;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -100,236 +171,150 @@ export default function Events() {
 
       {/* Alert */}
       {alert && (
-        <div className={`fixed top-20 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white font-medium transition-all
-          ${alert.type === "success" ? "bg-green-500" : "bg-red-500"}`}>
+        <div className={`fixed top-20 right-4 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-medium transition-all ${
+          alert.type === "error" ? "bg-red-500" : "bg-green-500"
+        }`}>
           {alert.message}
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">Campus Events</h1>
-          <p className="text-gray-500 mt-1">Discover and register for upcoming events</p>
-        </div>
-
-        {/* Search Bar */}
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="🔍 Search events by name or description..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white shadow-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-700"
-          />
-        </div>
-
-        {/* Category Filter */}
-        <div className="mb-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Category</p>
-          <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all
-                  ${selectedCategory === cat
-                    ? "bg-blue-600 text-white shadow"
-                    : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300"}`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Event Type Filter */}
-        <div className="mb-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Event Type</p>
-          <div className="flex flex-wrap gap-2">
-            {EVENT_TYPES.map(type => (
-              <button
-                key={type}
-                onClick={() => setSelectedType(type)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all
-                  ${selectedType === type
-                    ? "bg-indigo-600 text-white shadow"
-                    : "bg-white text-gray-600 border border-gray-200 hover:border-indigo-300"}`}
-              >
-                {type !== "All" && EVENT_TYPE_ICONS[type]} {type}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Results count */}
-        <p className="text-sm text-gray-500 mb-4">
-          Showing <span className="font-semibold text-gray-700">{filteredEvents.length}</span> events
-          {selectedType !== "All" && <span> · Type: <span className="font-semibold">{selectedType}</span></span>}
-          {selectedCategory !== "All" && <span> · Category: <span className="font-semibold">{selectedCategory}</span></span>}
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white py-12 px-4 text-center">
+        <h1 className="text-3xl font-bold mb-2">Campus Events</h1>
+        <p className="text-blue-200 text-sm">
+          {user ? `Welcome, ${user.firstName || user.name}!` : "Browse events — VIT students login, external students register as guest on open events"}
         </p>
 
-        {/* Events Grid */}
-        {loading ? (
-          <div className="flex justify-center items-center h-48">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        {/* Guest banner */}
+        {!user && (
+          <div className="mt-4 inline-flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-5 py-3 text-sm">
+            <span>🌐 Events marked <strong>Open to All</strong> accept external/non-VIT registrations</span>
+            <button onClick={() => navigate("/login")} className="bg-white text-blue-700 font-semibold px-3 py-1 rounded-lg hover:bg-blue-50 text-xs">
+              VIT Login →
+            </button>
           </div>
-        ) : filteredEvents.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <div className="text-5xl mb-3">📭</div>
-            <p className="text-lg font-medium">No events found</p>
-            <p className="text-sm">Try changing your filters</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEvents.map(event => (
-              <EventCard
-                key={event.id}
-                event={event}
-                isRegistered={isRegistered(event.id)}
-                isFull={isFull(event)}
-                isVITOnly={isVITOnly(event)}
-                registering={registering === event.id}
-                onRegister={handleRegister}
-              />
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="flex flex-wrap gap-3 mb-6">
+          <input
+            type="text"
+            placeholder="Search events..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="border rounded-lg px-4 py-2 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-blue-300"
+          />
+          <div className="flex flex-wrap gap-2">
+            {EVENT_TYPES.map(t => (
+              <button key={t}
+                onClick={() => setSelectedType(t)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                  selectedType === t ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+                }`}
+              >{t}</button>
             ))}
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIES.map(c => (
+              <button key={c}
+                onClick={() => setSelectedCategory(c)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                  selectedCategory === c ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+                }`}
+              >{c}</button>
+            ))}
+          </div>
+        </div>
 
-// ── Event Card Component ──────────────────────────────────────
-function EventCard({ event, isRegistered, isFull, isVITOnly, registering, onRegister }) {
-  const capacityPercent = Math.min(
-    (event.registered_count / event.max_participants) * 100, 100
-  );
-
-  const capacityColor =
-    capacityPercent >= 90 ? "bg-red-500" :
-    capacityPercent >= 70 ? "bg-yellow-400" : "bg-green-500";
-
-  const formatDate = (d) =>
-    new Date(d).toLocaleDateString("en-IN", {
-      day: "numeric", month: "short", year: "numeric",
-      hour: "2-digit", minute: "2-digit"
-    });
-
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden
-                    hover:shadow-md transition-all duration-200 flex flex-col">
-
-      {/* Hero Image with overlaid badges */}
-      <div className="relative h-44 bg-gradient-to-br from-indigo-400 to-purple-600">
-        {event.image_url ? (
-          <img src={event.image_url} alt={event.title}
-               className="w-full h-full object-cover" />
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+          </div>
+        ) : filteredEvents.length === 0 ? (
+          <p className="text-center text-gray-400 py-16 text-lg">No events found</p>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-5xl opacity-30">
-            {event.category === "Hackathon" ? "💻" :
-             event.category === "Cultural" ? "🎭" :
-             event.category === "Sports" ? "⚽" :
-             event.category === "Workshop" ? "🔧" : "🎓"}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredEvents.map(event => {
+              const totalSeats = Number(event.seats) || 0;
+              const registered = Number(event.registered_count || event.registered || 0);
+              const pct = totalSeats > 0 ? Math.min(100, Math.round((registered / totalSeats) * 100)) : 0;
+              const isFree = !event.fees || event.fees === "0" || event.fees?.toLowerCase() === "free";
+
+              return (
+                <div key={event.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                  {/* Card header */}
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 text-white">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="font-bold text-base leading-snug">{event.title}</h3>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {event.event_type && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold bg-white/20`}>
+                            {EVENT_TYPE_ICONS[event.event_type] || "📅"} {event.event_type}
+                          </span>
+                        )}
+                        {event.allow_external ? (
+                          <span className="text-xs bg-green-400/30 border border-green-300/50 text-green-100 px-2 py-0.5 rounded-full">🌐 Open to All</span>
+                        ) : (
+                          <span className="text-xs bg-white/10 border border-white/20 text-white/70 px-2 py-0.5 rounded-full">🔒 VIT Only</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-blue-100">
+                      {event.date && <span>📅 {new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                      {event.venue && <span>📍 {event.venue}</span>}
+                      <span className={`font-semibold ${isFree ? "text-green-300" : "text-yellow-300"}`}>
+                        {isFree ? "Free" : `₹${event.fees}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card body */}
+                  <div className="p-4 flex flex-col flex-1 gap-3">
+                    {event.description && (
+                      <p className="text-gray-500 text-xs line-clamp-2">{event.description}</p>
+                    )}
+                    {event.category && (
+                      <span className="self-start text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{event.category}</span>
+                    )}
+
+                    {/* Capacity bar */}
+                    {totalSeats > 0 && (
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-400 mb-1">
+                          <span>{registered} registered</span>
+                          <span>{totalSeats} seats</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-red-400" : pct >= 60 ? "bg-yellow-400" : "bg-green-400"}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-auto">
+                      {getRegistrationButton(event)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        )}
-
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-
-        {/* Category badge — top left */}
-        <span className="absolute top-3 left-3 bg-white/20 backdrop-blur-sm text-white
-                         text-xs font-semibold px-2.5 py-1 rounded-full border border-white/30">
-          {event.category}
-        </span>
-
-        {/* Event Type badge — top right */}
-        {event.event_type && (
-          <span className={`absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full
-                            backdrop-blur-sm bg-white/90 ${EVENT_TYPE_STYLES[event.event_type] || ""}`}>
-            {EVENT_TYPE_ICONS[event.event_type]} {event.event_type}
-          </span>
-        )}
-
-        {/* VIT Only tag */}
-        {!event.allow_external && (
-          <span className="absolute bottom-3 left-3 bg-orange-500 text-white
-                           text-xs font-bold px-2 py-0.5 rounded-full">
-            🔒 VIT Only
-          </span>
         )}
       </div>
 
-      {/* Card Body */}
-      <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-bold text-gray-800 text-base leading-snug mb-1 line-clamp-2">
-          {event.title}
-        </h3>
-        <p className="text-gray-500 text-sm line-clamp-2 mb-3">{event.description}</p>
-
-        {/* Meta info */}
-        <div className="space-y-1 text-xs text-gray-500 mb-3">
-          <div className="flex items-center gap-1.5">
-            <span>📅</span>
-            <span>{formatDate(event.date)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span>📍</span>
-            <span>{event.location}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span>💰</span>
-            <span>{event.fees || "Free"}</span>
-          </div>
-        </div>
-
-        {/* Capacity bar */}
-        <div className="mb-4">
-          <div className="flex justify-between text-xs text-gray-400 mb-1">
-            <span>{event.registered_count} registered</span>
-            <span>{event.max_participants} max</span>
-          </div>
-          <div className="w-full bg-gray-100 rounded-full h-1.5">
-            <div
-              className={`h-1.5 rounded-full transition-all ${capacityColor}`}
-              style={{ width: `${capacityPercent}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Register Button */}
-        <div className="mt-auto">
-          {isRegistered ? (
-            <button disabled
-              className="w-full py-2.5 rounded-xl bg-green-50 text-green-700 font-semibold
-                         text-sm border border-green-200 cursor-default">
-              ✅ Already Registered
-            </button>
-          ) : isVITOnly ? (
-            <button disabled
-              className="w-full py-2.5 rounded-xl bg-orange-50 text-orange-600 font-semibold
-                         text-sm border border-orange-200 cursor-default">
-              🔒 VIT Students Only
-            </button>
-          ) : isFull ? (
-            <button disabled
-              className="w-full py-2.5 rounded-xl bg-gray-50 text-gray-400 font-semibold
-                         text-sm border border-gray-200 cursor-default">
-              Fully Booked
-            </button>
-          ) : (
-            <button
-              onClick={() => onRegister(event.id)}
-              disabled={registering}
-              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white
-                         font-semibold text-sm transition-all active:scale-95 disabled:opacity-70">
-              {registering ? "Registering..." : "Register Now"}
-            </button>
-          )}
-        </div>
-      </div>
+      {/* Registration Modal */}
+      {modalEvent && (
+        <RegistrationModal
+          event={modalEvent}
+          user={user}
+          onConfirm={handleModalConfirm}
+          onClose={() => setModalEvent(null)}
+        />
+      )}
     </div>
   );
 }
