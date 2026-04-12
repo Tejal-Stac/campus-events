@@ -2,16 +2,25 @@ const pool = require('../config/db')
 
 const getAllEvents = async (req, res) => {
   try {
-    const { category, event_type } = req.query
+    const { category, event_type, status, created_by } = req.query
+
+    // Default to 'approved' status if not specified (protects student view)
+    const eventStatus = status || 'approved'
 
     let query = `
       SELECT e.*,
              COUNT(DISTINCT r.id)::int as registered_count
        FROM events e
        LEFT JOIN registrations r ON e.id = r.event_id
-       WHERE 1=1
+       WHERE e.status = $1
     `
-    const params = []
+    const params = [eventStatus]
+
+    // Optional: Filter by created_by (for faculty to see only their events)
+    if (created_by) {
+      params.push(created_by)
+      query += ` AND e.created_by = $${params.length}`
+    }
 
     if (category && category !== 'All') {
       params.push(category)
@@ -214,9 +223,21 @@ const registerForEvent = async (req, res) => {
     }
     const event = eventResult.rows[0]
 
-    // Guests can only register for allow_external events
-    if (isGuest && !event.allow_external) {
-      return res.status(403).json({ success: false, message: 'This event is for VIT students only' })
+    let userCollegeType = 'guest'
+    if (userId) {
+      const userResult = await pool.query(
+        'SELECT college_type FROM users WHERE id = $1',
+        [userId]
+      )
+      userCollegeType = userResult.rows[0]?.college_type || 'guest'
+    }
+
+    // Block non-VIT users from VIT-only events at the API level
+    if (event.allow_external === false && userCollegeType !== 'vitian') {
+      return res.status(403).json({
+        success: false,
+        message: 'This event is for VIT students only'
+      })
     }
 
     // Check seat availability
@@ -430,10 +451,96 @@ const rejectNonVitian = async (req, res) => {
   }
 }
 
+const getEventReport = async (req, res) => {
+  try {
+    const { eventId } = req.params
+    const { format = 'json' } = req.query
+
+    // Fetch event details
+    const eventResult = await pool.query(
+      'SELECT id, title, organising_club, date, venue, description FROM events WHERE id = $1',
+      [eventId]
+    )
+    if (eventResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Event not found' })
+    }
+
+    const event = eventResult.rows[0]
+
+    // Fetch all registrations for this event
+    const registrationsResult = await pool.query(
+      `SELECT 
+        r.id, r.user_id, r.name, r.email, r.phone, r.college_type,
+        r.prn, r.department, r.division, r.year,
+        u.email as user_email, u.name as user_name
+       FROM registrations r
+       LEFT JOIN users u ON r.user_id = u.id
+       WHERE r.event_id = $1
+       ORDER BY r.created_at DESC`,
+      [eventId]
+    )
+
+    const registrations = registrationsResult.rows
+
+    // Return JSON format
+    if (format === 'json' || !format) {
+      return res.json({
+        success: true,
+        data: {
+          event: event,
+          total_registrations: registrations.length,
+          registrations: registrations
+        }
+      })
+    }
+
+    // Return CSV format
+    if (format === 'csv') {
+      const headers = ['ID', 'Name', 'Email', 'Phone', 'College Type', 'PRN', 'Department', 'Division', 'Year', 'Registered On']
+      const rows = registrations.map(r => [
+        r.id,
+        r.name || r.user_name || 'N/A',
+        r.email || r.user_email || 'N/A',
+        r.phone || 'N/A',
+        r.college_type || 'N/A',
+        r.prn || 'N/A',
+        r.department || 'N/A',
+        r.division || 'N/A',
+        r.year || 'N/A',
+        new Date(r.created_at).toLocaleString()
+      ])
+
+      const csvContent = [
+        ['Event Report - ' + event.title],
+        ['Generated on', new Date().toLocaleString()],
+        [''],
+        ['Event Details:'],
+        ['Title', event.title],
+        ['Date', new Date(event.date).toLocaleDateString()],
+        ['Venue', event.venue || 'N/A'],
+        ['Organizer', event.organising_club || 'N/A'],
+        ['Total Registrations', registrations.length],
+        [''],
+        ['Participants:'],
+        headers,
+        ...rows
+      ].map(row => row.join(',')).join('\n')
+
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', `attachment; filename="event_${eventId}_participants.csv"`)
+      res.send(csvContent)
+    }
+  } catch (err) {
+    console.error('Error generating event report:', err)
+    res.status(500).json({ success: false, message: 'Failed to generate report', error: err.message })
+  }
+}
+
 module.exports = {
   getAllEvents, getEventById, createEvent,
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,
-  getPendingApprovals, approveNonVitian, rejectNonVitian
+  getPendingApprovals, approveNonVitian, rejectNonVitian,
+  getEventReport
 }

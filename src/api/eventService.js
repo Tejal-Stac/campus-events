@@ -8,8 +8,9 @@ import api from './axiosConfig';
 export const eventService = {
   /**
    * Fetch all events
-   * Optionally filter by category and/or event_type
+   * Optionally filter by category, event_type, and status
    * event_type values: 'National' | 'Intercollege' | 'Intracollege' | 'Department'
+   * status values: 'approved' (default), 'pending', 'rejected'
    */
   async getAllEvents(filters = {}) {
     try {
@@ -19,6 +20,10 @@ export const eventService = {
       }
       if (filters.event_type && filters.event_type !== 'All') {
         params.append('event_type', filters.event_type);
+      }
+      // Add status filter - defaults to 'approved' if not specified
+      if (filters.status) {
+        params.append('status', filters.status);
       }
       const query = params.toString() ? `?${params.toString()}` : '';
       const response = await api.get(`/events${query}`);

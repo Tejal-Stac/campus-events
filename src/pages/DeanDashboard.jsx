@@ -11,7 +11,8 @@ export default function DeanDashboard() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
   const [students, setStudents] = useState([])
-  const [events, setEvents] = useState([])
+  const [pendingEvents, setPendingEvents] = useState([])
+  const [approvedEvents, setApprovedEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [campusFilter, setCampusFilter] = useState('All')
   const [assignModal, setAssignModal] = useState(null)
@@ -33,13 +34,24 @@ export default function DeanDashboard() {
       const studentsData = await deanService.getStudents()
       setStudents(studentsData || [])
       
-      // Fetch events
+      // Fetch PENDING events for Dean approval queue
       try {
-        const eventsData = await eventService.getAllEvents()
-        setEvents(eventsData || [])
+        const pendingData = await eventService.getAllEvents({ status: 'pending' })
+        setPendingEvents(pendingData || [])
+        console.log(`📋 Loaded ${pendingData?.length || 0} pending events for Dean approval`)
       } catch (err) {
-        console.error('Error fetching events:', err)
-        setEvents([])
+        console.error('Error fetching pending events:', err)
+        setPendingEvents([])
+      }
+      
+      // Fetch APPROVED/LIVE events for Dean oversight
+      try {
+        const approvedData = await eventService.getAllEvents({ status: 'approved' })
+        setApprovedEvents(approvedData || [])
+        console.log(`✅ Loaded ${approvedData?.length || 0} approved events for Dean oversight`)
+      } catch (err) {
+        console.error('Error fetching approved events:', err)
+        setApprovedEvents([])
       }
     } catch (err) {
       console.error('Error fetching dashboard data:', err)
@@ -345,8 +357,8 @@ export default function DeanDashboard() {
             { label: 'Total Students', value: students?.length || 0, icon: '🎓', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
             { label: 'Coordinators', value: students?.filter(u => u.assignedRole === 'coordinator').length || 0, icon: '🎯', color: '#7c3aed', bg: '#fdf4ff', border: '#e9d5ff' },
             { label: 'Volunteers', value: students?.filter(u => u.assignedRole === 'volunteer').length || 0, icon: '🙋', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-            { label: 'Total Events', value: events?.length || 0, icon: '📅', color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
-            { label: 'Active Events', value: events?.filter(e => e.status === 'Active').length || 0, icon: '✅', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+            { label: 'Pending Approvals', value: pendingEvents?.length || 0, icon: '⏳', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
+            { label: 'Live Events', value: approvedEvents?.length || 0, icon: '✅', color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
           ].map(s => (
             <div 
               key={s.label} 
@@ -393,8 +405,8 @@ export default function DeanDashboard() {
                 { label: 'Total Students', value: students?.length || 0 },
                 { label: 'Coordinators', value: students?.filter(u => u.assignedRole === 'coordinator').length || 0 },
                 { label: 'Volunteers', value: students?.filter(u => u.assignedRole === 'volunteer').length || 0 },
-                { label: 'Active Events', value: events?.filter(e => e.status === 'Active').length || 0 },
-                { label: 'Total Events', value: events?.length || 0 },
+                { label: 'Pending Event Approvals', value: pendingEvents?.length || 0 },
+                { label: 'Live Approved Events', value: approvedEvents?.length || 0 },
               ].map((s, i) => (
                 <div 
                   key={s.label} 
@@ -417,17 +429,23 @@ export default function DeanDashboard() {
           <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
             <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '16px' }}>🎫 Event Approvals</h2>
             
-            {/* Pending Events */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ color: '#1a3a6b', fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>⏳ Pending Approval ({events?.filter(e => e.status === 'pending').length || 0})</h3>
-              {events?.filter(e => e.status === 'pending').length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', background: '#f8faff', borderRadius: '12px' }}>
+            {/* Pending Events - Requires Dean Action */}
+            <div style={{ marginBottom: '32px' }}>
+              <h3 style={{ color: '#d97706', fontSize: '15px', fontWeight: '700', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>⏳ Pending Approval</span>
+                <span style={{ background: '#fef3c7', color: '#d97706', borderRadius: '16px', padding: '2px 10px', fontSize: '12px', fontWeight: 'bold' }}>
+                  {pendingEvents?.length || 0}
+                </span>
+              </h3>
+              {pendingEvents?.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', background: '#f8faff', borderRadius: '12px', border: '1px solid #dbeafe' }}>
                   <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-                  <p style={{ fontSize: '14px', fontWeight: '600' }}>No pending events</p>
+                  <p style={{ fontSize: '14px', fontWeight: '600' }}>No pending events to review</p>
+                  <p style={{ fontSize: '12px', marginTop: '8px' }}>All events have been processed</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {events?.filter(e => e.status === 'pending').map(event => (
+                  {pendingEvents?.map(event => (
                     <EventCard
                       key={event.id}
                       event={event}
@@ -439,41 +457,35 @@ export default function DeanDashboard() {
               )}
             </div>
 
-            {/* Approved Events */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ color: '#1a3a6b', fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>✅ Approved Events ({events?.filter(e => e.status === 'approved' || e.status === 'Active').length || 0})</h3>
-              {events?.filter(e => e.status === 'approved' || e.status === 'Active').length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: '#64748b', background: '#f8faff', borderRadius: '12px' }}>
-                  <p style={{ fontSize: '12px' }}>No approved events yet</p>
+            {/* Live/Approved Events - For Oversight */}
+            <div style={{ borderTop: '1px solid #dbeafe', paddingTop: '24px' }}>
+              <h3 style={{ color: '#059669', fontSize: '15px', fontWeight: '700', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>✅ Live Events</span>
+                <span style={{ background: '#f0fdf4', color: '#059669', borderRadius: '16px', padding: '2px 10px', fontSize: '12px', fontWeight: 'bold' }}>
+                  {approvedEvents?.length || 0}
+                </span>
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>These events have been approved and are now visible to students</p>
+              {approvedEvents?.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px', color: '#64748b', background: '#f8faff', borderRadius: '12px', border: '1px solid #dbeafe' }}>
+                  <p style={{ fontSize: '13px' }}>No approved events yet. Approve pending events above to populate this section.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {events?.filter(e => e.status === 'approved' || e.status === 'Active').slice(0, 6).map(event => (
+                  {approvedEvents?.slice(0, 9).map(event => (
                     <EventCard
                       key={event.id}
                       event={event}
-                      role="view"
+                      role="dean"
+                      onAction={() => {
+                        // Dean can view approved events but cannot modify them
+                        // This is read-only for oversight purposes
+                      }}
                     />
                   ))}
                 </div>
               )}
             </div>
-
-            {/* Rejected Events */}
-            {events?.filter(e => e.status === 'rejected').length > 0 && (
-              <div>
-                <h3 style={{ color: '#1a3a6b', fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>❌ Rejected Events ({events?.filter(e => e.status === 'rejected').length || 0})</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {events?.filter(e => e.status === 'rejected').map(event => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      role="view"
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 

@@ -10,7 +10,8 @@ const {
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,
-  getPendingApprovals, approveNonVitian, rejectNonVitian
+  getPendingApprovals, approveNonVitian, rejectNonVitian,
+  getEventReport
 } = require('../controllers/eventController')
 
 // ─────────────────────────────────────────────────────────────
@@ -137,5 +138,6 @@ router.put('/:id/status', auth, isDean, updateEventStatus)
 router.patch('/:id/event-type', auth, updateEventType)
 router.post('/:id/register', optionalAuth, registerForEvent)   // ✅ single register route, supports both guest & logged-in
 router.get('/:id/registrations', auth, getEventRegistrations)
+router.get('/:eventId/report', auth, getEventReport)
 
 module.exports = router

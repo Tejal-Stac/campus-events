@@ -19,14 +19,12 @@ export default function CoordinatorDashboard() {
   const { user: authUser } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
-  const [newEvent, setNewEvent] = useState({ title: '', date: '', category: '', seats: '', venue: '', desc: '', event_type: 'Intracollege' })
   const [user, setUser] = useState(null)
   const [events, setEvents] = useState([])
   const [volunteers, setVolunteers] = useState([])
   const [stats, setStats] = useState({ eventsCount: 0, registrationsCount: 0, volunteersCount: 0 })
   const [loading, setLoading] = useState(true)
   const [pendingUsers, setPendingUsers] = useState([])
-  const updateEvent = (field, value) => setNewEvent(prev => ({ ...prev, [field]: value }))
 
   useEffect(() => {
     const fetchData = async () => {
@@ -147,7 +145,6 @@ export default function CoordinatorDashboard() {
     { id: 'overview', label: '📊 Overview' },
     { id: 'events', label: '📅 My Events' },
     { id: 'volunteers', label: '👥 Volunteers' },
-    { id: 'create', label: '➕ Create Event' },
     { id: 'approvals', label: `🔔 Approvals${pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ''}` },
   ]
 
@@ -185,10 +182,6 @@ export default function CoordinatorDashboard() {
                       🔔 {pendingUsers.length} Pending
                     </button>
                   )}
-                  <button onClick={() => setActiveTab('create')}
-                    style={{ background: '#fff', color: '#1a3a6b', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
-                    + Create New Event
-                  </button>
                 </div>
               </div>
             </div>
@@ -462,100 +455,6 @@ export default function CoordinatorDashboard() {
               </div>
             )}
 
-            {/* Create Event Tab */}
-            {activeTab === 'create' && (
-              <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '28px', maxWidth: '640px' }}>
-                <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '6px' }}>➕ Create New Event</h2>
-                <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '24px' }}>Fill in the details to publish your event on CampusEvents</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div>
-                    <label style={labelStyle}>Event Title *</label>
-                    <input style={inputStyle} placeholder="e.g. National Hackathon 2025" value={newEvent.title} onChange={e => updateEvent('title', e.target.value)}
-                      onFocus={e => { e.target.style.borderColor = '#1a3a6b'; e.target.style.background = '#fff' }}
-                      onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div>
-                      <label style={labelStyle}>Event Date *</label>
-                      <input style={inputStyle} type="date" value={newEvent.date} onChange={e => updateEvent('date', e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Category *</label>
-                      <select style={{ ...inputStyle, cursor: 'pointer' }} value={newEvent.category} onChange={e => updateEvent('category', e.target.value)}>
-                        <option value="">Select category</option>
-                        {['Hackathon', 'Cultural', 'Seminar', 'Sports', 'Workshop', 'Networking'].map(c => (
-                          <option key={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Event Type *</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                      {EVENT_TYPE_OPTIONS.map(type => {
-                        const s = EVENT_TYPE_STYLES[type]
-                        const isSelected = newEvent.event_type === type
-                        return (
-                          <button key={type} type="button" onClick={() => updateEvent('event_type', type)}
-                            style={{
-                              padding: '10px 6px', borderRadius: '10px',
-                              border: `2px solid ${isSelected ? s.color : '#e2e8f0'}`,
-                              background: isSelected ? s.bg : '#f8faff',
-                              color: isSelected ? s.color : '#64748b',
-                              fontSize: '12px', fontWeight: '700', cursor: 'pointer',
-                              textAlign: 'center', transition: 'all 0.15s'
-                            }}>
-                            <div style={{ fontSize: '18px', marginBottom: '4px' }}>{s.icon}</div>
-                            {type}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <p style={{ color: '#94a3b8', fontSize: '11px', marginTop: '6px' }}>
-                      {newEvent.event_type === 'National' && '🏆 Open to participants across India'}
-                      {newEvent.event_type === 'Intercollege' && '🎓 Open to students from multiple colleges'}
-                      {newEvent.event_type === 'Intracollege' && '🏫 Open to VIT students only'}
-                      {newEvent.event_type === 'Department' && '📚 Limited to a specific department'}
-                    </p>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div>
-                      <label style={labelStyle}>Total Seats *</label>
-                      <input style={inputStyle} type="number" placeholder="e.g. 120" value={newEvent.seats} onChange={e => updateEvent('seats', e.target.value)}
-                        onFocus={e => { e.target.style.borderColor = '#1a3a6b'; e.target.style.background = '#fff' }}
-                        onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Venue *</label>
-                      <input style={inputStyle} placeholder="e.g. Main Auditorium" value={newEvent.venue} onChange={e => updateEvent('venue', e.target.value)}
-                        onFocus={e => { e.target.style.borderColor = '#1a3a6b'; e.target.style.background = '#fff' }}
-                        onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
-                    </div>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Event Description *</label>
-                    <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }} placeholder="Describe your event..." value={newEvent.desc} onChange={e => updateEvent('desc', e.target.value)}
-                      onFocus={e => { e.target.style.borderColor = '#1a3a6b'; e.target.style.background = '#fff' }}
-                      onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
-                  </div>
-                  <div style={{ background: '#f8faff', border: '2px dashed #bfdbfe', borderRadius: '10px', padding: '20px', textAlign: 'center', cursor: 'pointer' }}>
-                    <p style={{ color: '#64748b', fontSize: '13px' }}>🖼️ Click to upload event banner / poster</p>
-                    <p style={{ color: '#94a3b8', fontSize: '11px', marginTop: '4px' }}>PNG, JPG up to 5MB</p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                    <button style={{ flex: 1, background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-                      Save as Draft
-                    </button>
-                    <button onClick={() => alert(`Event "${newEvent.title}" published!`)}
-                      style={{ flex: 2, background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
-                      🚀 Publish Event
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           <footer style={{ background: '#1a3a6b', color: '#93c5fd', textAlign: 'center', padding: '20px', fontSize: '13px', marginTop: '40px' }}>
