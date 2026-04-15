@@ -60,6 +60,73 @@ const getEventById = async (req, res) => {
   }
 }
 
+const getEventParticipants = async (req, res) => {
+  try {
+    const eventId = req.params.id || req.params.eventId  // ✅ Handle both naming conventions
+    const userId = req.user.id
+
+    if (!eventId) {
+      return res.status(400).json({ success: false, message: 'Event ID is required' })
+    }
+
+    // First, verify that the requesting user created this event
+    const eventCheck = await pool.query(
+      'SELECT id, created_by, title FROM events WHERE id = $1',
+      [eventId]
+    )
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Event not found' })
+    }
+
+    const event = eventCheck.rows[0]
+
+    // Verify ownership - only event creator can view participants
+    if (event.created_by !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized: You can only view participants for your own events'
+      })
+    }
+
+    // ✅ Fetch participants with JOIN between registrations and users
+    // Returns EMPTY ARRAY [] with 200 OK if no participants exist
+    const participantsResult = await pool.query(
+      `SELECT
+        r.id AS registration_id,
+        r.id,
+        r.user_id,
+        COALESCE(u.first_name || ' ' || u.last_name, r.name) as name,
+        COALESCE(u.email, r.email) as email,
+        r.reg_phone as phone,
+        r.reg_department as department,
+        r.reg_college_name as college_name,
+        COALESCE(u.college_type, r.college_type, 'unknown') as college_type,
+        r.created_at as registered_at,
+        r.reg_prn as prn,
+        r.reg_year as year,
+        r.reg_division as division
+       FROM registrations r
+       LEFT JOIN users u ON r.user_id = u.id
+       WHERE r.event_id = $1
+       ORDER BY r.created_at DESC`,
+      [eventId]
+    )
+
+    const participants = participantsResult.rows || []  // ✅ Always return array
+
+    // ✅ STANDARDIZED: Clean, predictable JSON format
+    // Frontend expects: { success: true, participants: [...] }
+    res.status(200).json({
+      success: true,
+      participants: participants
+    })
+  } catch (err) {
+    console.error('Error fetching event participants:', err)
+    res.status(500).json({ success: false, message: 'Server error fetching participants', error: err.message })
+  }
+}
+
 const createEvent = async (req, res) => {
   const {
     title, organisingClub, saVertical, date, day,
@@ -126,6 +193,130 @@ const createEvent = async (req, res) => {
     res.status(500).json({
       success: false, message: 'Server error creating event',
       error: err.message, code: err.code, detail: err.detail
+    })
+  }
+}
+
+const updateEvent = async (req, res) => {
+  const { eventId } = req.params
+  const userId = req.user.id
+  
+  const {
+    title, saVertical, date, day, timeFrom, timeTo, venue, onlineLink,
+    targetAudience, expectedCount, seats, fees, contact, category,
+    keyFeatures, desc, department, contactNumber, event_type, allow_external
+  } = req.body
+
+  if (!title || !date || !venue) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing required fields',
+      required: ['title', 'date', 'venue']
+    })
+  }
+
+  try {
+    // Check if event exists and belongs to the current user
+    const eventCheck = await pool.query(
+      'SELECT id, created_by FROM events WHERE id = $1',
+      [eventId]
+    )
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Event not found' })
+    }
+
+    // Verify ownership - only creator can edit
+    if (eventCheck.rows[0].created_by !== userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Unauthorized: You can only edit your own events' 
+      })
+    }
+
+    // Parse keyFeatures
+    let featuresString = ''
+    if (keyFeatures) {
+      if (Array.isArray(keyFeatures)) {
+        featuresString = keyFeatures.join(',')
+      } else if (typeof keyFeatures === 'string') {
+        featuresString = keyFeatures
+      }
+    }
+    const featuresArray = featuresString
+      ? featuresString.split(',').map(k => k.trim()).filter(k => k)
+      : []
+
+    // Update event with RESET status to 'pending' for re-approval
+    const result = await pool.query(
+      `UPDATE events SET
+        title = $1,
+        sa_vertical = $2,
+        date = $3,
+        day = $4,
+        time_from = $5,
+        time_to = $6,
+        venue = $7,
+        online_link = $8,
+        target_audience = $9,
+        expected_count = $10,
+        seats = $11,
+        fees = $12,
+        contact = $13,
+        category = $14,
+        key_features = $15,
+        description = $16,
+        event_type = $17,
+        department = $18,
+        contact_number = $19,
+        allow_external = $20,
+        status = 'pending',
+        updated_at = NOW()
+       WHERE id = $21 AND created_by = $22
+       RETURNING *`,
+      [
+        title,
+        saVertical || null,
+        date,
+        day || null,
+        timeFrom || null,
+        timeTo || null,
+        venue,
+        onlineLink || null,
+        targetAudience || 'All',
+        expectedCount || 0,
+        seats || 100,
+        fees || 'Free',
+        contact || null,
+        category || 'General',
+        JSON.stringify(featuresArray),
+        desc || null,
+        event_type || 'Intracollege',
+        department || null,
+        contactNumber || contact || null,
+        allow_external || false,
+        eventId,
+        userId
+      ]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(403).json({ success: false, message: 'Failed to update event' })
+    }
+
+    console.log(`✏️ Event ${eventId} updated and reset to 'pending' by user ${userId}`)
+    res.json({
+      success: true,
+      message: '✏️ Event updated! It has been moved back to pending for Dean re-approval.',
+      data: result.rows[0]
+    })
+  } catch (err) {
+    console.error('\n🔴 ===== UPDATE EVENT ERROR =====')
+    console.error('Error Message:', err.message)
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating event',
+      error: err.message
     })
   }
 }
@@ -458,7 +649,8 @@ const getEventReport = async (req, res) => {
 
     // Fetch event details
     const eventResult = await pool.query(
-      'SELECT id, title, organising_club, date, venue, description FROM events WHERE id = $1',
+      `SELECT id, title, organising_club, date, venue, description, status
+       FROM events WHERE id = $1`,
       [eventId]
     )
     if (eventResult.rows.length === 0) {
@@ -467,12 +659,20 @@ const getEventReport = async (req, res) => {
 
     const event = eventResult.rows[0]
 
-    // Fetch all registrations for this event
+    // Fetch all registrations with user details (JOIN)
     const registrationsResult = await pool.query(
       `SELECT 
-        r.id, r.user_id, r.name, r.email, r.phone, r.college_type,
-        r.prn, r.department, r.division, r.year,
-        u.email as user_email, u.name as user_name
+        r.id,
+        r.user_id,
+        COALESCE(r.name, u.first_name || ' ' || u.last_name, 'Guest') as name,
+        COALESCE(r.email, u.email) as email,
+        r.reg_phone as phone,
+        COALESCE(u.college_type, r.college_type, 'unknown') as college_type,
+        r.reg_prn as prn,
+        r.reg_department as department,
+        r.reg_division as division,
+        r.reg_year as year,
+        r.created_at as registered_on
        FROM registrations r
        LEFT JOIN users u ON r.user_id = u.id
        WHERE r.event_id = $1
@@ -482,13 +682,21 @@ const getEventReport = async (req, res) => {
 
     const registrations = registrationsResult.rows
 
-    // Return JSON format
+    // Return JSON format (default)
     if (format === 'json' || !format) {
       return res.json({
         success: true,
         data: {
-          event: event,
-          total_registrations: registrations.length,
+          event: {
+            id: event.id,
+            title: event.title,
+            date: event.date,
+            venue: event.venue,
+            organising_club: event.organising_club,
+            description: event.description,
+            status: event.status,
+            total_registrations: registrations.length
+          },
           registrations: registrations
         }
       })
@@ -496,23 +704,24 @@ const getEventReport = async (req, res) => {
 
     // Return CSV format
     if (format === 'csv') {
-      const headers = ['ID', 'Name', 'Email', 'Phone', 'College Type', 'PRN', 'Department', 'Division', 'Year', 'Registered On']
+      const headers = ['ID', 'Name', 'Email', 'Phone', 'College Type', 'PRN', 'Department', 'Year', 'Division', 'Registered On']
       const rows = registrations.map(r => [
         r.id,
-        r.name || r.user_name || 'N/A',
-        r.email || r.user_email || 'N/A',
+        r.name || 'N/A',
+        r.email || 'N/A',
         r.phone || 'N/A',
         r.college_type || 'N/A',
         r.prn || 'N/A',
         r.department || 'N/A',
-        r.division || 'N/A',
         r.year || 'N/A',
-        new Date(r.created_at).toLocaleString()
+        r.division || 'N/A',
+        new Date(r.registered_on).toLocaleString()
       ])
 
       const csvContent = [
-        ['Event Report - ' + event.title],
-        ['Generated on', new Date().toLocaleString()],
+        ['Event Attendance Report'],
+        ['', event.title],
+        ['Date Generated', new Date().toLocaleString()],
         [''],
         ['Event Details:'],
         ['Title', event.title],
@@ -521,13 +730,13 @@ const getEventReport = async (req, res) => {
         ['Organizer', event.organising_club || 'N/A'],
         ['Total Registrations', registrations.length],
         [''],
-        ['Participants:'],
+        ['Participant Details:'],
         headers,
         ...rows
-      ].map(row => row.join(',')).join('\n')
+      ].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
 
-      res.setHeader('Content-Type', 'text/csv')
-      res.setHeader('Content-Disposition', `attachment; filename="event_${eventId}_participants.csv"`)
+      res.setHeader('Content-Type', 'text/csv;charset=utf-8;')
+      res.setHeader('Content-Disposition', `attachment; filename="attendance_${eventId}_${Date.now()}.csv"`)
       res.send(csvContent)
     }
   } catch (err) {
@@ -537,7 +746,7 @@ const getEventReport = async (req, res) => {
 }
 
 module.exports = {
-  getAllEvents, getEventById, createEvent,
+  getAllEvents, getEventById, getEventParticipants, createEvent, updateEvent,
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,

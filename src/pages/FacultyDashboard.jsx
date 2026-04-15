@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import eventService from "../api/eventService";
 import Navbar from "../components/Navbar";
 import EventCard from "../components/EventCard";
+import { Users, Mail, Phone, Calendar, X, AlertCircle } from "lucide-react";
 
 const EVENT_TYPE_STYLES = {
   National:     "bg-red-100 text-red-700 border-red-200",
@@ -29,6 +30,10 @@ export default function FacultyDashboard() {
   const [newEvent, setNewEvent] = useState({ title: '', date: '', category: '', seats: '', venue: '', desc: '', event_type: 'Intracollege', allow_external: false });
   const [creating, setCreating] = useState(false);
   const [alert, setAlert] = useState(null);
+  const [viewingParticipants, setViewingParticipants] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [participantsError, setParticipantsError] = useState(null);
 
   useEffect(() => {
     if (user && user.role !== "faculty") {
@@ -54,9 +59,9 @@ export default function FacultyDashboard() {
         showAlert('Edit functionality coming soon', 'info');
         break;
       
-      case 'markAttendance':
-        console.log('Mark attendance for event:', eventId);
-        showAlert('📋 Attendance marking feature coming soon', 'info');
+      case 'viewParticipants':
+        // Fetch and display participants
+        await handleViewParticipants(eventId, event.title);
         break;
       
       case 'analytics':
@@ -70,6 +75,66 @@ export default function FacultyDashboard() {
       
       default:
         break;
+    }
+  };
+
+  const handleViewParticipants = async (eventId, eventTitle) => {
+    try {
+      if (!eventId) {
+        showAlert('❌ Event ID is missing', 'error');
+        return;
+      }
+      
+      setLoadingParticipants(true);
+      setParticipantsError(null);
+      setViewingParticipants({ id: eventId, title: eventTitle });
+      
+      // ✅ Call service - returns array directly
+      const response = await eventService.getEventParticipants(eventId);
+      
+      // ✅ Defensive coding: extract array from response
+      const data = response || [];
+      
+      // ✅ Verify we have an array
+      if (!Array.isArray(data)) {
+        console.error("Expected array but got:", typeof data, data);
+        setParticipants([]);
+        setParticipantsError('Unexpected response format from server');
+        showAlert('⚠️ Unexpected response format from server', 'error');
+        return;
+      }
+      
+      // ✅ Set participants array
+      setParticipants(data);
+      const count = data.length;
+      console.log(`✅ Loaded ${count} participant${count !== 1 ? 's' : ''} for "${eventTitle}"`);
+      
+      // ✅ Show success message
+      if (count === 0) {
+        showAlert('📋 No students have registered yet', 'info');
+      } else {
+        showAlert(`✅ Loaded ${count} participant${count !== 1 ? 's' : ''}`, 'success');
+      }
+    } catch (err) {
+      console.error('❌ Error fetching participants:', err);
+      
+      // ✅ Better error handling
+      let errorMsg = 'Failed to load participants';
+      if (err.response?.status === 404) {
+        errorMsg = 'Event not found';
+      } else if (err.response?.status === 403) {
+        errorMsg = 'You can only view participants for your own events';
+      } else if (err.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
+      setParticipantsError(errorMsg);
+      showAlert(`❌ ${errorMsg}`, 'error');
+      setParticipants([]);
+    } finally {
+      setLoadingParticipants(false);
     }
   };
 
@@ -147,6 +212,235 @@ export default function FacultyDashboard() {
 
   // ✅ NaN guard
   const totalRegistrations = events.reduce((s, e) => s + (e.registered_count || 0), 0);
+
+  // If viewing participants, show modal instead of dashboard
+  if (viewingParticipants) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+
+        {/* Participants Modal */}
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">{viewingParticipants.title}</h2>
+                <p className="text-gray-500 text-sm mt-1">
+                  {participants.length} participant{participants.length !== 1 ? 's' : ''} registered
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setViewingParticipants(null);
+                  setParticipants([]);
+                  setParticipantsError(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body - Table */}
+            {loadingParticipants ? (
+              <div className="flex justify-center py-20">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm">Loading participants...</p>
+                </div>
+              </div>
+            ) : participantsError ? (
+              <div className="flex flex-col items-center justify-center py-16 px-6">
+                <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+                <p className="text-red-600 font-semibold">Error Loading Participants</p>
+                <p className="text-gray-500 text-sm mt-2">{participantsError}</p>
+              </div>
+            ) : participants === null || participants === undefined || participants.length === 0 ? (
+              <div className="text-center py-16 px-6">
+                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">No students have registered yet</p>
+                <p className="text-gray-400 text-sm">Participants will appear here once they register for this event</p>
+              </div>
+            ) : (
+              <div className="px-6 py-4">
+                {/* Grid-based Table Header */}
+                <div className="grid grid-cols-12 gap-4 pb-4 mb-4 border-b border-gray-200">
+                  <div className="col-span-2 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-slate-500" />
+                    <span className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Name</span>
+                  </div>
+                  <div className="col-span-3 flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-slate-500" />
+                    <span className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Email</span>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-slate-500" />
+                    <span className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Phone</span>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Department</span>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-500 uppercase tracking-wide">College</span>
+                  </div>
+                  <div className="col-span-1 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-slate-500" />
+                    <span className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Joined</span>
+                  </div>
+                </div>
+
+                {/* Grid-based Table Rows */}
+                <div className="space-y-0 max-h-96 overflow-y-auto">
+                  {Array.isArray(participants) && participants.map((participant, index) => {
+                    if (!participant) return null;
+                    
+                    // ✅ Fallback for name: use email prefix if name is missing
+                    const displayName = participant.name || participant.email?.split('@')[0] || 'N/A';
+                    
+                    return (
+                      <div 
+                        key={participant.registration_id || participant.id || index} 
+                        className={`grid grid-cols-12 gap-4 py-4 px-3 rounded-lg transition-colors ${
+                          index % 2 === 0 ? 'bg-gray-50 hover:bg-gray-100' : 'bg-white hover:bg-gray-50'
+                        }`}
+                      >
+                        {/* Name Cell */}
+                        <div className="col-span-2">
+                          <p className="text-sm font-medium text-[#1C1D1F] truncate">
+                            {displayName}
+                          </p>
+                        </div>
+
+                        {/* Email Cell */}
+                        <div className="col-span-3">
+                          <p className="text-sm text-slate-600 truncate">
+                            {participant.email || 'N/A'}
+                          </p>
+                        </div>
+
+                        {/* Phone Cell */}
+                        <div className="col-span-2">
+                          <p className="text-sm text-slate-600">
+                            {participant.phone || 'N/A'}
+                          </p>
+                        </div>
+
+                        {/* Department Cell */}
+                        <div className="col-span-2">
+                          <p className="text-sm text-slate-600 truncate">
+                            {participant.department || 'N/A'}
+                          </p>
+                        </div>
+
+                        {/* College Badge Cell */}
+                        <div className="col-span-2 flex items-center">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                            participant.college_type === 'vitian' 
+                              ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                              : participant.college_type === 'non_vitian'
+                                ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                                : 'bg-gray-100 text-gray-700 border border-gray-300'
+                          }`}>
+                            {participant.college_type === 'vitian' ? 'VIT' : participant.college_type === 'non_vitian' ? 'Non-VIT' : 'Guest'}
+                          </span>
+                        </div>
+
+                        {/* Registration Date Cell */}
+                        <div className="col-span-1">
+                          <p className="text-xs text-slate-500 whitespace-nowrap">
+                            {participant.registered_at ? new Date(participant.registered_at).toLocaleDateString('en-IN', {
+                              month: 'short',
+                              day: 'numeric'
+                            }) : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+              <div className="text-sm text-slate-600">
+                Total participants: 
+                <span className="ml-2 font-semibold text-[#1C1D1F]">
+                  {participants.length}
+                </span>
+              </div>
+              <div className="flex gap-3 w-full sm:w-auto">
+                <button
+                  onClick={() => {
+                    // Download as CSV
+                    if (participants.length === 0) {
+                      showAlert('⚠️ No participants to download', 'warning');
+                      return;
+                    }
+
+                    const headers = ['Name', 'Email', 'Phone', 'Department', 'College Type', 'PRN', 'Year', 'Division', 'Registered'];
+                    const rows = participants.map(p => {
+                      const displayName = p.name || p.email?.split('@')[0] || '';
+                      return [
+                        displayName,
+                        p.email || '',
+                        p.phone || '',
+                        p.department || '',
+                        p.college_type || '',
+                        p.prn || '',
+                        p.year || '',
+                        p.division || '',
+                        p.registered_at ? new Date(p.registered_at).toLocaleString() : ''
+                      ];
+                    });
+
+                    const csvContent = [
+                      ['Event: ' + viewingParticipants.title],
+                      ['Downloaded on ' + new Date().toLocaleString()],
+                      ['Total Participants: ' + participants.length],
+                      [''],
+                      headers,
+                      ...rows
+                    ].map(row => 
+                      row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')
+                    ).join('\n');
+
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `participants_${viewingParticipants.id}_${Date.now()}.csv`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(link.href);
+
+                    showAlert('✅ Participants list downloaded as CSV');
+                  }}
+                  className="flex-1 sm:flex-none px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download CSV
+                </button>
+                <button
+                  onClick={() => {
+                    setViewingParticipants(null);
+                    setParticipants([]);
+                    setParticipantsError(null);
+                  }}
+                  className="flex-1 sm:flex-none px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

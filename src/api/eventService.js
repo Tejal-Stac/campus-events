@@ -168,6 +168,84 @@ export const eventService = {
     }
   },
 
+  /**
+   * Get event participants (Faculty only - for their own events)
+   * ✅ Returns: Array of participants
+   * Backend sends: { success: true, participants: [...] }
+   */
+  async getEventParticipants(eventId) {
+    try {
+      if (!eventId) throw new Error('Event ID is required');
+      const response = await api.get(`/events/${eventId}/participants`);
+      // ✅ Extract participants array from response
+      const participants = response.data.participants || [];
+      if (!Array.isArray(participants)) {
+        throw new Error('Invalid participants format: expected array');
+      }
+      return participants;
+    } catch (error) {
+      console.error('Error fetching event participants:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Download event attendance report as CSV
+   * Includes registrations data with name, email, phone, department, etc.
+   */
+  async downloadEventReport(eventId, eventTitle) {
+    try {
+      // Fetch report data in JSON format
+      const response = await api.get(`/events/${eventId}/report?format=json`);
+      const { registrations } = response.data.data;
+
+      // Prepare CSV headers
+      const headers = ['ID', 'Name', 'Email', 'Phone', 'College Type', 'PRN', 'Department', 'Year', 'Division', 'Registered On'];
+      
+      // Prepare CSV rows
+      const rows = registrations.map(r => [
+        r.id || '',
+        r.name || '',
+        r.email || '',
+        r.phone || '',
+        r.college_type || '',
+        r.prn || '',
+        r.department || '',
+        r.year || '',
+        r.division || '',
+        new Date(r.registered_on).toLocaleString()
+      ]);
+
+      // Build CSV content
+      const csvContent = [
+        ['Event Attendance Report'],
+        ['', eventTitle],
+        ['Date Generated', new Date().toLocaleString()],
+        [''],
+        ['Participant Details:'],
+        headers,
+        ...rows
+      ].map(row => 
+        row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')
+      ).join('\n');
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `attendance_${eventId}_${Date.now()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+      return { success: true, message: 'Report downloaded successfully' };
+    } catch (error) {
+      console.error('Error downloading event report:', error);
+      throw error;
+    }
+  },
+
   // Legacy aliases
   getEvents(filters = {}) { return this.getAllEvents(filters); },
   getMyEvents() { return this.getAllEvents(); },

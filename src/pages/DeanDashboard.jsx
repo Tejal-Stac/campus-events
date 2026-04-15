@@ -457,7 +457,7 @@ export default function DeanDashboard() {
               )}
             </div>
 
-            {/* Live/Approved Events - For Oversight */}
+            {/* Live/Approved Events - For Oversight (Read-Only) */}
             <div style={{ borderTop: '1px solid #dbeafe', paddingTop: '24px' }}>
               <h3 style={{ color: '#059669', fontSize: '15px', fontWeight: '700', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span>✅ Live Events</span>
@@ -477,6 +477,7 @@ export default function DeanDashboard() {
                       key={event.id}
                       event={event}
                       role="dean"
+                      readOnly={true}
                       onAction={() => {
                         // Dean can view approved events but cannot modify them
                         // This is read-only for oversight purposes

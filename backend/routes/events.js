@@ -6,7 +6,7 @@ const auth = require('../middleware/auth')                    // default export
 const { isDean, isFacultyOrDean } = require('../middleware/auth')  // named exports
 const optionalAuth = require('../middleware/optionalAuth')
 const {
-  getAllEvents, getEventById, createEvent,
+  getAllEvents, getEventById, getEventParticipants, createEvent, updateEvent,
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,
@@ -134,10 +134,12 @@ router.get('/generate/:eventId', auth, async (req, res) => {
 // ── /:id routes LAST (so they don't swallow named routes above) ──
 router.get('/:id', getEventById)
 router.post('/', auth, isFacultyOrDean, createEvent)
+router.put('/:eventId', auth, isFacultyOrDean, updateEvent)
 router.put('/:id/status', auth, isDean, updateEventStatus)
 router.patch('/:id/event-type', auth, updateEventType)
 router.post('/:id/register', optionalAuth, registerForEvent)   // ✅ single register route, supports both guest & logged-in
 router.get('/:id/registrations', auth, getEventRegistrations)
+router.get('/:eventId/participants', auth, getEventParticipants)
 router.get('/:eventId/report', auth, getEventReport)
 
 module.exports = router
