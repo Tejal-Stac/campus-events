@@ -4,11 +4,12 @@ import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 
 const roles = [
-  { id: 'student', label: 'Student', icon: '🎓', desc: 'Access events & certificates' },
-  { id: 'faculty', label: 'Faculty', icon: '👨‍🏫', desc: 'Manage & create events' },
-  { id: 'coordinator', label: 'Coordinator', icon: '🎯', desc: 'Coordinate assigned events' },
-  { id: 'volunteer', label: 'Volunteer', icon: '🙋', desc: 'View assigned duties' },
-  { id: 'dean', label: 'Dean / Admin', icon: '👑', desc: 'Full system access' },
+  { id: 'student',     label: 'Student',      icon: '🎓', desc: 'Access events & certificates' },
+  { id: 'faculty',     label: 'Faculty',       icon: '👨‍🏫', desc: 'Manage & create events' },
+  { id: 'hod',         label: 'HOD',           icon: '🏛️', desc: 'Department head view' },
+  { id: 'coordinator', label: 'Coordinator',   icon: '🎯', desc: 'Coordinate assigned events' },
+  { id: 'volunteer',   label: 'Volunteer',     icon: '🙋', desc: 'View assigned duties' },
+  { id: 'dean',        label: 'Dean / Admin',  icon: '👑', desc: 'Full system access' },
 ]
 
 export default function Login() {
@@ -17,12 +18,11 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [emailError, setEmailError] = useState('')
   const [error, setError] = useState('')
-  const [isPending, setIsPending] = useState(false)   // ── NEW: pending state
+  const [isPending, setIsPending] = useState(false)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const { login } = useAuth()
 
-  // ── UPDATED: only validate @vit.edu for non-student roles ──
   const validateEmail = (val) => {
     if (selectedRole !== 'student' && val && !val.endsWith('@vit.edu')) {
       setEmailError('Only @vit.edu email addresses are allowed for this role')
@@ -37,7 +37,6 @@ export default function Login() {
     e.preventDefault()
     setIsPending(false)
 
-    // ── UPDATED: block non-VIT emails only for non-student roles ──
     if (selectedRole !== 'student' && !email.endsWith('@vit.edu')) {
       setEmailError('Only @vit.edu email addresses are allowed for this role')
       return
@@ -53,13 +52,14 @@ export default function Login() {
       console.log('🔍 User Role:', user.role)
 
       const dashboardMap = {
-        student: '/student-dashboard',
+        student:     '/student-dashboard',
         coordinator: '/coordinator-dashboard',
-        club_head: '/coordinator-dashboard',
-        volunteer: '/volunteer-dashboard',
-        faculty: '/faculty-dashboard',
-        dean: '/dean-dashboard',
-        admin: '/admin-dashboard',
+        club_head:   '/coordinator-dashboard',
+        volunteer:   '/volunteer-dashboard',
+        faculty:     '/faculty-dashboard',
+        hod:         '/hod-dashboard',
+        dean:        '/dean-dashboard',
+        admin:       '/admin-dashboard',
       }
 
       const targetPath = dashboardMap[user.role] || '/dashboard'
@@ -68,8 +68,6 @@ export default function Login() {
 
     } catch (err) {
       console.error('❌ Login error:', err)
-
-      // ── NEW: handle pending approval (403) separately ──
       if (err.response?.status === 403) {
         setIsPending(true)
       } else {
@@ -93,14 +91,12 @@ export default function Login() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px', paddingTop: '80px' }}>
         <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '20px', width: '100%', maxWidth: '480px', padding: '40px', boxShadow: '0 8px 32px rgba(26,58,107,0.08)' }}>
 
-          {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: '28px' }}>
             <div style={{ background: '#1a3a6b', borderRadius: '12px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '800', fontSize: '16px', margin: '0 auto 12px' }}>CE</div>
             <h1 style={{ color: '#1a3a6b', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Welcome Back</h1>
             <p style={{ color: '#64748b', fontSize: '13px' }}>Vishwakarma Institute of Technology, Pune</p>
           </div>
 
-          {/* ── NEW: Pending Approval Screen ── */}
           {isPending ? (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
               <div style={{ fontSize: '56px', marginBottom: '16px' }}>⏳</div>
@@ -124,7 +120,6 @@ export default function Login() {
             </div>
           ) : (
             <>
-              {/* Role Selector */}
               <p style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '700', marginBottom: '10px' }}>Select your role</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '24px' }}>
                 {roles.map(r => (
@@ -144,7 +139,6 @@ export default function Login() {
                 ))}
               </div>
 
-              {/* Selected Role Badge */}
               <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '8px 14px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '16px' }}>{roles.find(r => r.id === selectedRole)?.icon}</span>
                 <span style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '600' }}>
@@ -152,7 +146,16 @@ export default function Login() {
                 </span>
               </div>
 
-              {/* ── NEW: Non-VITian info badge (only on student role + non-VIT email) ── */}
+              {/* HOD hint — shows when HOD card is selected */}
+              {selectedRole === 'hod' && (
+                <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '16px' }}>ℹ️</span>
+                  <p style={{ color: '#0c4a6e', fontSize: '12px' }}>
+                    HODs register as Faculty. Your role is upgraded to HOD by the Dean. You can also use the Faculty card to login.
+                  </p>
+                </div>
+              )}
+
               {selectedRole === 'student' && isNonVitian && (
                 <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '16px' }}>🏫</span>
@@ -162,14 +165,12 @@ export default function Login() {
                 </div>
               )}
 
-              {/* Error Message */}
               {error && (
                 <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
                   <p style={{ color: '#dc2626', fontSize: '13px' }}>⚠️ {error}</p>
                 </div>
               )}
 
-              {/* Form */}
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                   <label style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>

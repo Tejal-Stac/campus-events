@@ -19,6 +19,8 @@ app.use('/api/events', require('./routes/events'))
 app.use('/api/users', require('./routes/users'))
 app.use('/api/certificates', require('./routes/certificates'))
 app.use('/api/import', require('./routes/import'))
+app.use('/api/hod', require('./routes/hod'))
+app.use('/api/dean', require('./routes/dean'))
 
 app.get('/', (req, res) => {
   res.json({ message: 'Campus Events Backend is running!' })

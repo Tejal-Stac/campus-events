@@ -1,312 +1,315 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import axios from 'axios'
+
+const API = 'http://localhost:5000'
 
 export default function Profile() {
-  const { user } = useAuth()
+  const { user: authUser, logout } = useAuth()
+  const [profile, setProfile] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
-  const [registrations, setRegistrations] = useState([])
+  const [editForm, setEditForm] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    department: '',
-    year: '',
-    grNumber: '',
-    bio: '',
-    interests: [],
-    linkedin: '',
-  })
+  const [msg, setMsg] = useState('')
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      const u = JSON.parse(storedUser)
-      setForm({
-        firstName: u.firstName || '',
-        lastName: u.lastName || '',
-        email: u.email || '',
-        phone: u.phone || '',
-        department: u.department || '',
-        year: u.year || '',
-        grNumber: u.gr_number || '',
-        bio: u.bio || '',
-        interests: u.interests || [],
-        linkedin: u.linkedin || '',
-      })
-    }
-    setLoading(false)
-  }, [])
+  const getToken = () => localStorage.getItem('token')
 
-  const handleSave = async () => {
+  useEffect(() => { fetchProfile() }, [])
+
+  const fetchProfile = async () => {
     try {
-      setSaving(true)
-      const token = localStorage.getItem('token')
-      const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
-
-      const response = await fetch(`http://localhost:5000/api/users/${storedUser.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          first_name: form.firstName,
-          last_name: form.lastName,
-          phone: form.phone,
-          department: form.department,
-          year: form.year,
-          bio: form.bio,
-          interests: form.interests,
-        })
+      const res = await axios.get(`${API}/api/users/profile`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
       })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.message || 'Update failed')
+      const data = res.data.data || res.data
+      // ✅ Fix: parse interests if it's a string
+      if (data.interests && typeof data.interests === 'string') {
+        try { data.interests = JSON.parse(data.interests) } catch { data.interests = [] }
       }
-
-      // Update localStorage with new data
-      const updated = { ...storedUser, firstName: form.firstName, lastName: form.lastName, phone: form.phone, department: form.department, year: form.year }
-      localStorage.setItem('user', JSON.stringify(updated))
-
-      setActiveTab('overview')
-      alert('✅ Profile updated successfully!')
-    } catch (error) {
-      console.error('Error saving profile:', error)
-      alert('❌ Failed to save profile: ' + error.message)
+      if (!Array.isArray(data.interests)) data.interests = []
+      setProfile(data)
+      setEditForm(data)
+    } catch (e) {
+      console.error('Profile fetch error:', e.message)
     } finally {
-      setSaving(false)
+      setLoading(false)
     }
   }
 
-  const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
-
-  const getInitials = () => {
-    const f = form.firstName?.[0] || ''
-    const l = form.lastName?.[0] || ''
-    return (f + l).toUpperCase() || 'U'
+  const getInitials = (name) => {
+    if (!name) return '?'
+    return name.split(' ').map(p => p[0]).filter(Boolean).join('').toUpperCase().slice(0, 2)
   }
 
-  const fullName = `${form.firstName} ${form.lastName}`.trim() || 'Student'
+  const getRoleBadge = (role) => {
+    const map = {
+      student:     { label: 'Student',     color: '#1d4ed8', bg: '#eff6ff' },
+      faculty:     { label: 'Faculty',     color: '#059669', bg: '#f0fdf4' },
+      hod:         { label: 'HOD',         color: '#7c3aed', bg: '#fdf4ff' },
+      coordinator: { label: 'Coordinator', color: '#d97706', bg: '#fffbeb' },
+      volunteer:   { label: 'Volunteer',   color: '#0891b2', bg: '#f0f9ff' },
+      dean:        { label: 'Dean',        color: '#dc2626', bg: '#fef2f2' },
+      admin:       { label: 'Admin',       color: '#dc2626', bg: '#fef2f2' },
+    }
+    return map[role] || { label: role, color: '#64748b', bg: '#f1f5f9' }
+  }
+
+  const getBio = (p) => {
+    if (!p) return ''
+    if (p.bio) return p.bio
+    if (p.role === 'hod' && p.department) return `Head of Department of ${p.department}`
+    return ''
+  }
+
+  // ✅ Safe interests getter — always returns array
+  const getInterests = (p) => {
+    if (!p) return []
+    if (Array.isArray(p.interests)) return p.interests
+    if (typeof p.interests === 'string') {
+      try { return JSON.parse(p.interests) } catch { return [] }
+    }
+    return []
+  }
 
   const inputStyle = {
     background: '#f8faff', border: '1px solid #cbd5e1', color: '#1a3a6b',
-    borderRadius: '10px', width: '100%', padding: '11px 14px',
+    borderRadius: '8px', width: '100%', padding: '10px 12px',
     fontSize: '13px', outline: 'none', boxSizing: 'border-box'
   }
-  const labelStyle = { color: '#1a3a6b', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }
 
-  const tabs = [
-    { id: 'overview', label: '👤 Overview' },
-    { id: 'history', label: '📅 History' },
-    { id: 'edit', label: '✏️ Edit Profile' },
-  ]
+  if (loading) return (
+    <div style={{ background: '#f0f4ff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: '#1a3a6b', fontWeight: '600' }}>Loading profile...</p>
+    </div>
+  )
 
-  if (loading) {
-    return (
-      <div style={{ background: '#f0f4ff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '56px' }}>
-        <p style={{ color: '#1a3a6b' }}>Loading profile...</p>
-      </div>
-    )
-  }
+  const p = profile
+  const roleBadge = getRoleBadge(p?.role)
+  const bio = getBio(p)
+  const interests = getInterests(p)
+  const fullName = p?.name || `${p?.firstName || ''} ${p?.lastName || ''}`.trim()
 
   return (
     <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
 
-      {/* Header Banner */}
-      <div style={{ background: 'linear-gradient(135deg, #1a3a6b, #2563eb)', paddingTop: '56px' }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px 0' }}>
-          <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', padding: '32px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '20px' }}>
+      {/* Navbar */}
+      <div style={{ background: '#1a3a6b', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '56px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ background: '#fff', borderRadius: '8px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', color: '#1a3a6b', fontSize: '12px' }}>CE</div>
+          <span style={{ color: '#fff', fontWeight: '700' }}>CampusEvents</span>
+        </div>
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+          <a href="/events" style={{ color: '#93c5fd', fontSize: '13px', textDecoration: 'none' }}>Events</a>
+          <a href="/profile" style={{ color: '#fff', fontSize: '13px', textDecoration: 'none', fontWeight: '700', background: 'rgba(255,255,255,0.15)', padding: '4px 12px', borderRadius: '6px' }}>Profile</a>
+          <span style={{ color: '#93c5fd', fontSize: '13px' }}>⭐ {p?.points || 0} pts</span>
+          <div style={{ background: '#2563eb', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '12px' }}>
+            {getInitials(fullName)}
+          </div>
+          <button onClick={logout} style={{ color: '#93c5fd', fontSize: '12px', background: 'none', border: '1px solid #475569', borderRadius: '6px', padding: '4px 12px', cursor: 'pointer' }}>Logout</button>
+        </div>
+      </div>
+
+      {/* Profile Header Banner */}
+      <div style={{ background: 'linear-gradient(135deg, #1a3a6b 0%, #2563eb 100%)', padding: '40px 0 80px' }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '0 24px' }} />
+      </div>
+
+      <div style={{ maxWidth: '900px', margin: '-60px auto 0', padding: '0 24px 40px', position: 'relative' }}>
+
+        {/* Profile Card */}
+        <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '20px', padding: '28px', marginBottom: '20px', boxShadow: '0 4px 24px rgba(26,58,107,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{ background: '#1a3a6b', borderRadius: '50%', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '800', fontSize: '28px', flexShrink: 0 }}>
-                {getInitials()}
+              <div style={{ background: '#1a3a6b', borderRadius: '50%', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '800', fontSize: '28px', flexShrink: 0, border: '4px solid #fff', boxShadow: '0 4px 12px rgba(26,58,107,0.2)' }}>
+                {getInitials(fullName)}
               </div>
               <div>
                 <h1 style={{ color: '#1a3a6b', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>{fullName}</h1>
-                <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '8px' }}>{form.department} · {form.year} · {form.grNumber}</p>
-                <p style={{ color: '#94a3b8', fontSize: '13px', maxWidth: '400px' }}>{form.bio || 'Update your bio in the Edit Profile section!'}</p>
-                {form.linkedin && (
-                  <a href={form.linkedin} target="_blank" rel="noopener noreferrer"
-                    style={{ color: '#2563eb', fontSize: '12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '4px 12px', textDecoration: 'none', fontWeight: '600', display: 'inline-block', marginTop: '8px' }}>
-                    🔗 LinkedIn
-                  </a>
+                <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '6px' }}>
+                  {p?.department || ''}{p?.department && p?.campus ? ' · ' : ''}{p?.campus || ''}
+                </p>
+                {bio ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '14px' }}>🏛️</span>
+                    <span style={{ color: '#7c3aed', fontSize: '14px', fontWeight: '600' }}>{bio}</span>
+                  </div>
+                ) : (
+                  <p style={{ color: '#94a3b8', fontSize: '13px', fontStyle: 'italic', marginBottom: '8px' }}>
+                    Update your bio in Edit Profile!
+                  </p>
                 )}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ background: roleBadge.bg, color: roleBadge.color, borderRadius: '20px', fontSize: '12px', padding: '3px 12px', fontWeight: '700' }}>
+                    {p?.role === 'hod' ? '🏛️' : p?.role === 'dean' ? '👑' : p?.role === 'faculty' ? '👨‍🏫' : '🎓'} {roleBadge.label}
+                  </span>
+                  {p?.designation && (
+                    <span style={{ background: '#f0f4ff', color: '#1a3a6b', borderRadius: '20px', fontSize: '12px', padding: '3px 12px', fontWeight: '600' }}>
+                      {p.designation}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <button onClick={() => setActiveTab('edit')}
-              style={{ background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
+              style={{ background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               ✏️ Edit Profile
             </button>
           </div>
         </div>
-      </div>
 
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 24px 40px' }}>
-
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', background: '#fff', padding: '20px', borderBottom: '1px solid #dbeafe', marginBottom: '24px' }}>
+        {/* Stats Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
           {[
-            { label: 'Events Attended', value: registrations?.length || 0, icon: '🎯', color: '#1d4ed8', bg: '#eff6ff' },
-            { label: 'Certificates', value: 0, icon: '📜', color: '#059669', bg: '#f0fdf4' },
-            { label: 'Interests', value: form.interests?.length || 0, icon: '💡', color: '#d97706', bg: '#fffbeb' },
-            { label: 'Points', value: 0, icon: '⭐', color: '#7c3aed', bg: '#fdf4ff' },
+            { label: 'Events Attended', value: 0,                icon: '🎯', color: '#1d4ed8', bg: '#eff6ff' },
+            { label: 'Certificates',    value: 0,                icon: '📜', color: '#059669', bg: '#f0fdf4' },
+            { label: 'Interests',       value: interests.length, icon: '💡', color: '#d97706', bg: '#fffbeb' },
+            { label: 'Points',          value: p?.points || 0,  icon: '⭐', color: '#7c3aed', bg: '#fdf4ff' },
           ].map(s => (
-            <div key={s.label} style={{ background: s.bg, borderRadius: '12px', textAlign: 'center', padding: '16px' }}>
-              <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
-              <div style={{ color: s.color, fontSize: '24px', fontWeight: '800' }}>{s.value}</div>
-              <div style={{ color: '#64748b', fontSize: '12px' }}>{s.label}</div>
+            <div key={s.label} style={{ background: s.bg, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', marginBottom: '4px' }}>{s.icon}</div>
+              <div style={{ color: s.color, fontSize: '22px', fontWeight: '800' }}>{s.value}</div>
+              <div style={{ color: '#64748b', fontSize: '11px' }}>{s.label}</div>
             </div>
           ))}
         </div>
 
         {/* Tabs */}
-        <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '4px', display: 'inline-flex', gap: '4px', marginBottom: '20px' }}>
-          {tabs.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '8px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', border: 'none', cursor: 'pointer',
-                background: activeTab === tab.id ? '#1a3a6b' : 'transparent',
-                color: activeTab === tab.id ? '#fff' : '#64748b'
-              }}>
-              {tab.label}
+        <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '4px', display: 'inline-flex', gap: '4px', marginBottom: '16px' }}>
+          {[
+            { id: 'overview', label: '👤 Overview' },
+            { id: 'history',  label: '📋 History' },
+            { id: 'edit',     label: '✏️ Edit Profile' },
+          ].map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
+              style={{ padding: '8px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', border: 'none', cursor: 'pointer', background: activeTab === t.id ? '#1a3a6b' : 'transparent', color: activeTab === t.id ? '#fff' : '#64748b' }}>
+              {t.label}
             </button>
           ))}
         </div>
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-              <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '16px' }}>📋 Personal Information</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {[
-                  { label: 'Full Name', value: fullName, icon: '👤' },
-                  { label: 'Email', value: form.email, icon: '📧' },
-                  { label: 'Phone', value: form.phone || 'Not added', icon: '📱' },
-                  { label: 'Department', value: form.department || 'Not added', icon: '🏫' },
-                  { label: 'Year', value: form.year || 'Not added', icon: '📅' },
-                  { label: 'GR Number', value: form.grNumber || 'Not added', icon: '🪪' },
-                ].map(item => (
-                  <div key={item.label} style={{ background: '#f8faff', borderRadius: '10px', padding: '11px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #dbeafe' }}>
-                    <span style={{ color: '#64748b', fontSize: '13px' }}>{item.icon} {item.label}</span>
-                    <span style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '600' }}>{item.value}</span>
-                  </div>
-                ))}
-              </div>
+              <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '15px', marginBottom: '16px' }}>📋 Personal Information</h2>
+              {[
+                { label: '👤 Full Name',   value: fullName },
+                { label: '📧 Email',        value: p?.email },
+                { label: '📱 Phone',        value: p?.phone || 'Not added' },
+                { label: '🏛️ Department',   value: p?.department || 'Not added' },
+                { label: '🗓️ Year',         value: p?.year || 'Not added' },
+                { label: '🎫 GR Number',    value: p?.grNumber || 'Not added' },
+                ...(p?.role === 'hod' ? [{ label: '🏛️ Bio', value: bio || 'Not set' }] : []),
+              ].map(item => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#f8faff', borderRadius: '8px', marginBottom: '8px' }}>
+                  <span style={{ color: '#64748b', fontSize: '13px' }}>{item.label}</span>
+                  <span style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '600', textAlign: 'right', maxWidth: '55%' }}>{item.value}</span>
+                </div>
+              ))}
             </div>
 
             <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-              <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '16px' }}>🎯 Interests</h2>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {form.interests?.length > 0 ? (
-                  form.interests.map(i => (
-                    <span key={i} style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '20px', fontSize: '13px', padding: '5px 14px', fontWeight: '500' }}>{i}</span>
-                  ))
-                ) : (
-                  <p style={{ color: '#94a3b8', fontSize: '13px' }}>No interests added yet. Edit your profile to add some!</p>
-                )}
-              </div>
+              <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '15px', marginBottom: '16px' }}>🎯 Interests</h2>
+              {interests.length === 0 ? (
+                <p style={{ color: '#94a3b8', fontSize: '13px', fontStyle: 'italic' }}>No interests added yet. Edit your profile to add some!</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {interests.map((interest, i) => (
+                    <span key={i} style={{ background: '#eff6ff', color: '#1a3a6b', borderRadius: '20px', padding: '4px 14px', fontSize: '12px', fontWeight: '600' }}>
+                      {interest}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {p?.role === 'hod' && (
+                <div style={{ marginTop: '20px', background: '#fdf4ff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '16px' }}>
+                  <h3 style={{ color: '#7c3aed', fontWeight: '700', fontSize: '13px', marginBottom: '8px' }}>🏛️ HOD Information</h3>
+                  <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '4px' }}>Department: <strong style={{ color: '#7c3aed' }}>{p.department}</strong></p>
+                  <p style={{ color: '#64748b', fontSize: '12px' }}>Bio: <strong style={{ color: '#7c3aed' }}>{bio || 'Not set'}</strong></p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* History Tab */}
         {activeTab === 'history' && (
-          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-            <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '24px' }}>📅 Event Participation History</h2>
-            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-              <div style={{ fontSize: '48px', marginBottom: '12px' }}>📅</div>
-              <p style={{ fontSize: '14px', fontWeight: '600' }}>No events in your history yet</p>
-              <p style={{ fontSize: '13px', marginTop: '8px' }}>Register for events to see them here!</p>
-            </div>
+          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+            <p style={{ color: '#64748b', fontSize: '14px' }}>Event history coming soon...</p>
           </div>
         )}
 
         {/* Edit Tab */}
         {activeTab === 'edit' && (
-          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px', maxWidth: '600px' }}>
-            <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '24px' }}>✏️ Edit Your Profile</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <label style={labelStyle}>First Name</label>
-                  <input style={inputStyle} value={form.firstName} onChange={e => update('firstName', e.target.value)}
-                    onFocus={e => { e.target.style.borderColor = '#1a3a6b'; e.target.style.background = '#fff' }}
-                    onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Last Name</label>
-                  <input style={inputStyle} value={form.lastName} onChange={e => update('lastName', e.target.value)}
-                    onFocus={e => { e.target.style.borderColor = '#1a3a6b'; e.target.style.background = '#fff' }}
-                    onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
-                </div>
+          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
+            <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '15px', marginBottom: '20px' }}>✏️ Edit Profile</h2>
+            {msg && (
+              <div style={{ background: msg.includes('✅') ? '#f0fdf4' : '#fef2f2', border: `1px solid ${msg.includes('✅') ? '#bbf7d0' : '#fecaca'}`, borderRadius: '8px', padding: '10px 14px', marginBottom: '16px' }}>
+                <p style={{ color: msg.includes('✅') ? '#059669' : '#dc2626', fontSize: '13px' }}>{msg}</p>
               </div>
-
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                {[
+                  { label: 'First Name', field: 'firstName' },
+                  { label: 'Last Name',  field: 'lastName' },
+                ].map(({ label, field }) => (
+                  <div key={field}>
+                    <label style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>{label}</label>
+                    <input style={inputStyle} value={editForm[field] || ''} onChange={e => setEditForm(prev => ({ ...prev, [field]: e.target.value }))} />
+                  </div>
+                ))}
+              </div>
               <div>
-                <label style={labelStyle}>Email (read only)</label>
-                <input style={{ ...inputStyle, background: '#f1f5f9', color: '#94a3b8' }} value={form.email} readOnly />
+                <label style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>Phone</label>
+                <input style={inputStyle} value={editForm.phone || ''} onChange={e => setEditForm(prev => ({ ...prev, phone: e.target.value }))} placeholder="10-digit number" />
               </div>
-
               <div>
-                <label style={labelStyle}>Phone</label>
-                <input style={inputStyle} value={form.phone} onChange={e => update('phone', e.target.value)} placeholder="+91 XXXXX XXXXX"
-                  onFocus={e => { e.target.style.borderColor = '#1a3a6b'; e.target.style.background = '#fff' }}
-                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
+                <label style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>Department</label>
+                <input style={inputStyle} value={editForm.department || ''} onChange={e => setEditForm(prev => ({ ...prev, department: e.target.value }))} />
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              {p?.role === 'hod' && (
                 <div>
-                  <label style={labelStyle}>Department</label>
-                  <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.department} onChange={e => update('department', e.target.value)}>
-                    <option value="">Select</option>
-                    {['CSE', 'IT', 'MECH', 'CIVIL', 'ENTC', 'MBA', 'CHEMICAL'].map(b => <option key={b}>{b}</option>)}
-                  </select>
+                  <label style={{ color: '#7c3aed', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>🏛️ Profile Bio (HOD)</label>
+                  <input style={{ ...inputStyle, borderColor: '#e9d5ff' }}
+                    value={editForm.bio || bio || ''}
+                    onChange={e => setEditForm(prev => ({ ...prev, bio: e.target.value }))}
+                    placeholder={`Head of Department of ${p.department}`} />
+                  <p style={{ color: '#64748b', fontSize: '11px', marginTop: '4px' }}>This bio appears on your profile</p>
                 </div>
-                <div>
-                  <label style={labelStyle}>Year</label>
-                  <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.year} onChange={e => update('year', e.target.value)}>
-                    <option value="">Select</option>
-                    {['FE', 'SE', 'TE', 'BE'].map(y => <option key={y}>{y}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Bio</label>
-                <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }} value={form.bio} onChange={e => update('bio', e.target.value)} placeholder="Tell us about yourself..."
-                  onFocus={e => { e.target.style.borderColor = '#1a3a6b'; e.target.style.background = '#fff' }}
-                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
-              </div>
-
-              <div>
-                <label style={labelStyle}>LinkedIn URL</label>
-                <input style={inputStyle} value={form.linkedin} onChange={e => update('linkedin', e.target.value)} placeholder="https://linkedin.com/in/yourname"
-                  onFocus={e => { e.target.style.borderColor = '#1a3a6b'; e.target.style.background = '#fff' }}
-                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8faff' }} />
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button onClick={() => setActiveTab('overview')}
-                  style={{ flex: 1, background: '#f0f4ff', color: '#1a3a6b', border: '1px solid #dbeafe', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-                  Cancel
-                </button>
-                <button onClick={handleSave} disabled={saving}
-                  style={{ flex: 2, background: saving ? '#94a3b8' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '700', cursor: saving ? 'not-allowed' : 'pointer' }}>
-                  {saving ? '⏳ Saving...' : '💾 Save Changes'}
-                </button>
-              </div>
+              )}
+              <button
+                onClick={async () => {
+                  setSaving(true); setMsg('')
+                  try {
+                    await axios.put(`${API}/api/users/${p.id}`, {
+                      first_name: editForm.firstName,
+                      last_name: editForm.lastName,
+                      phone: editForm.phone,
+                      department: editForm.department,
+                      year: editForm.year,
+                      bio: editForm.bio,
+                      interests: Array.isArray(editForm.interests) ? editForm.interests : []
+                    }, {
+                      headers: { Authorization: `Bearer ${getToken()}` }
+                    })
+                    setMsg('✅ Profile updated successfully!')
+                    fetchProfile()
+                  } catch (e) {
+                    setMsg('❌ Failed to update: ' + (e.response?.data?.message || e.message))
+                  } finally { setSaving(false) }
+                }}
+                disabled={saving}
+                style={{ background: saving ? '#94a3b8' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '700', cursor: saving ? 'not-allowed' : 'pointer' }}>
+                {saving ? '⏳ Saving...' : '💾 Save Changes'}
+              </button>
             </div>
           </div>
         )}
       </div>
-
-      <footer style={{ background: '#1a3a6b', color: '#93c5fd', textAlign: 'center', padding: '20px', fontSize: '13px' }}>
-        © 2025 CampusEvents · Vishwakarma Institute of Technology, Pune
-      </footer>
     </div>
   )
 }

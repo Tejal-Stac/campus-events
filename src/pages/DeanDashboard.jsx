@@ -1,783 +1,472 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-import { deanService } from '../api/deanService'
-import { eventService } from '../api/eventService'
-import axios from 'axios'
-import EventCard from '../components/EventCard'
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import Navbar from "../components/Navbar";
+import axios from "axios";
+
+const API = "http://localhost:5000/api";
+
+const DEPT_COLORS = [
+  "#6366f1", "#10b981", "#f59e0b", "#ef4444",
+  "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6",
+  "#f97316", "#84cc16"
+];
 
 export default function DeanDashboard() {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('overview')
-  const [students, setStudents] = useState([])
-  const [pendingEvents, setPendingEvents] = useState([])
-  const [approvedEvents, setApprovedEvents] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [campusFilter, setCampusFilter] = useState('All')
-  const [assignModal, setAssignModal] = useState(null)
-  const [assignRole, setAssignRole] = useState('coordinator')
-  const [uploadFile, setUploadFile] = useState(null)
-  const [uploadType, setUploadType] = useState('students')
-  const [uploadStatus, setUploadStatus] = useState('')
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token");
 
-  // Fetch data on mount
+  const [activeTab, setActiveTab] = useState("overview");
+  const [analytics, setAnalytics] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [alert, setAlert] = useState(null);
+
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const showAlert = (msg, type = "success") => {
+    setAlert({ msg, type });
+    setTimeout(() => setAlert(null), 4000);
+  };
+
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
+    if (user && user.role !== "dean" && user.role !== "admin") {
+      navigate(`/${user.role}-dashboard`, { replace: true });
+    }
+  }, [user, navigate]);
 
-  const fetchDashboardData = async () => {
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
+
+  useEffect(() => {
+    fetchStudents();
+  }, [deptFilter]);
+
+  const fetchAnalytics = async () => {
     try {
-      setLoading(true)
-      
-      // Fetch students
-      const studentsData = await deanService.getStudents()
-      setStudents(studentsData || [])
-      
-      // Fetch PENDING events for Dean approval queue
-      try {
-        const pendingData = await eventService.getAllEvents({ status: 'pending' })
-        setPendingEvents(pendingData || [])
-        console.log(`📋 Loaded ${pendingData?.length || 0} pending events for Dean approval`)
-      } catch (err) {
-        console.error('Error fetching pending events:', err)
-        setPendingEvents([])
-      }
-      
-      // Fetch APPROVED/LIVE events for Dean oversight
-      try {
-        const approvedData = await eventService.getAllEvents({ status: 'approved' })
-        setApprovedEvents(approvedData || [])
-        console.log(`✅ Loaded ${approvedData?.length || 0} approved events for Dean oversight`)
-      } catch (err) {
-        console.error('Error fetching approved events:', err)
-        setApprovedEvents([])
-      }
+      const res = await axios.get(`${API}/dean/analytics`, { headers });
+      setAnalytics(res.data.data);
     } catch (err) {
-      console.error('Error fetching dashboard data:', err)
-      alert('Failed to load dashboard data: ' + (err.response?.data?.message || err.message))
+      showAlert(err.response?.data?.message || "Failed to load analytics", "error");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // Promote student handler
-  const handlePromote = async () => {
-    if (!assignModal || !assignRole) return
-    
+  const fetchStudents = async () => {
     try {
-      const result = await deanService.promoteStudent(assignModal.id, assignRole)
-      alert(result.message || 'Student promoted successfully!')
-      setAssignModal(null)
-      
-      // Refresh students list
-      fetchDashboardData()
+      const url = deptFilter === "all"
+        ? `${API}/dean/students`
+        : `${API}/dean/students?department=${deptFilter}`;
+      const res = await axios.get(url, { headers });
+      setStudents(res.data.data || []);
     } catch (err) {
-      console.error('Error promoting student:', err)
-      alert('Failed to promote student: ' + (err.response?.data?.message || err.message))
+      console.error("Students fetch failed:", err.message);
     }
-  }
-
-  // Approve event handler
-  const handleApproveEvent = async (eventId, remarks = '') => {
-    if (!window.confirm('Approve this event?')) return
-    
-    try {
-      await eventService.approveEvent(eventId)
-      alert('✅ Event approved successfully!')
-      fetchDashboardData() // Refresh events list
-    } catch (err) {
-      console.error('Error approving event:', err)
-      alert('Failed to approve event: ' + (err.response?.data?.message || err.message))
-    }
-  }
-
-  // Reject event handler
-  const handleRejectEvent = async (eventId, remarks = '') => {
-    if (!window.confirm('Reject this event? This cannot be undone.')) return
-    
-    try {
-      await eventService.rejectEvent(eventId)
-      alert('❌ Event rejected')
-      fetchDashboardData() // Refresh events list
-    } catch (err) {
-      console.error('Error rejecting event:', err)
-      alert('Failed to reject event: ' + (err.response?.data?.message || err.message))
-    }
-  }
-
-  // Handle EventCard actions (approve/reject)
-  const handleAction = (action, eventId, remarks = '') => {
-    if (action === 'approve') {
-      handleApproveEvent(eventId, remarks)
-    } else if (action === 'reject') {
-      handleRejectEvent(eventId, remarks)
-    }
-  }
-
-  // Get initials for avatar
-  const getInitials = (name) => {
-    if (!name) return 'DN'
-    const parts = name.split(' ')
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    }
-    return name.substring(0, 2).toUpperCase()
-  }
-
-  // Dean info from AuthContext with proper null checks
-  const deanInfo = {
-    name: user?.name || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Dean'),
-    email: user?.email || 'dean@vit.edu',
-    avatar: getInitials(user?.name || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : null))
-  }
-
-  // Role-based protection: Redirect if not dean/admin
-  useEffect(() => {
-    if (user && !['dean', 'admin'].includes(user.role)) {
-      const roleRedirectMap = {
-        student: '/student-dashboard',
-        faculty: '/faculty-dashboard',
-        coordinator: '/coordinator-dashboard',
-        club_head: '/coordinator-dashboard',
-        volunteer: '/volunteer-dashboard'
-      }
-      const redirectPath = roleRedirectMap[user.role] || '/dashboard'
-      navigate(redirectPath, { replace: true })
-    }
-  }, [user, navigate])
-
-  const filteredUsers = students.filter(u => {
-    const matchCampus = campusFilter === 'All' || u.campus === campusFilter
-    return matchCampus
-  })
+  };
 
   const tabs = [
-    { id: 'overview', label: '📊 Overview' },
-    { id: 'events', label: '🎫 Event Approvals' },
-    { id: 'students', label: '👥 Manage Students' },
-    { id: 'assign', label: '🎯 Promote Students' },
-    { id: 'import', label: '📤 Bulk Import' },
-    { id: 'reports', label: '📈 Reports' },
-  ]
+    { id: "overview", label: "📊 Overview" },
+    { id: "departments", label: "🏛️ Departments" },
+    { id: "events", label: "📅 Event Analytics" },
+    { id: "students", label: "👥 All Students" },
+  ];
 
-  if (loading) {
-    return (
-      <div style={{ background: '#f0f4ff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-          <p style={{ color: '#1a3a6b', fontSize: '16px', fontWeight: '600' }}>Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
+  const summary = analytics?.summary || {};
+  const departments = analytics?.departments || [];
+  const eventStats = analytics?.recentEventStats || [];
 
   return (
-    <div style={{ background: '#f0f4ff', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
 
-      {/* Assign Role Modal */}
-      {assignModal && (
-        <div 
-          onClick={() => setAssignModal(null)}
-          style={{ 
-            position: 'fixed', inset: 0, background: 'rgba(26,58,107,0.5)', 
-            zIndex: 200, display: 'flex', alignItems: 'center', 
-            justifyContent: 'center', padding: '20px' 
-          }}
-        >
-          <div 
-            onClick={e => e.stopPropagation()}
-            style={{ 
-              background: '#fff', borderRadius: '20px', padding: '32px', 
-              maxWidth: '460px', width: '100%', 
-              boxShadow: '0 24px 64px rgba(26,58,107,0.2)' 
-            }}
-          >
-            <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '18px', marginBottom: '4px' }}>
-              🎯 Promote Student
-            </h2>
-            <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '20px' }}>
-              Promoting: <strong style={{ color: '#1a3a6b' }}>
-                {assignModal?.firstName || assignModal?.first_name || ''} {assignModal?.lastName || assignModal?.last_name || ''}
-              </strong>
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={{ color: '#1a3a6b', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>
-                  Select Role *
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  {['coordinator', 'volunteer'].map(r => (
-                    <button 
-                      key={r} 
-                      onClick={() => setAssignRole(r)}
-                      style={{
-                        padding: '12px', borderRadius: '10px', fontSize: '13px', 
-                        fontWeight: '600', cursor: 'pointer',
-                        background: assignRole === r ? '#1a3a6b' : '#f0f4ff',
-                        color: assignRole === r ? '#fff' : '#64748b',
-                        border: `2px solid ${assignRole === r ? '#1a3a6b' : '#dbeafe'}`
-                      }}
-                    >
-                      {r === 'coordinator' ? '🎯 Coordinator' : '🙋 Volunteer'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '12px' }}>
-                <p style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>
-                  📋 Promotion Summary
-                </p>
-                <p style={{ color: '#64748b', fontSize: '12px' }}>
-                  👤 {assignModal?.firstName || assignModal?.first_name || ''} {assignModal?.lastName || assignModal?.last_name || ''}
-                </p>
-                <p style={{ color: '#64748b', fontSize: '12px' }}>
-                  🏫 {assignModal?.department || 'N/A'} - {assignModal?.campus || 'N/A'}
-                </p>
-                <p style={{ color: '#64748b', fontSize: '12px' }}>
-                  🎯 New Role: <strong>{assignRole}</strong>
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button 
-                  onClick={() => setAssignModal(null)}
-                  style={{ 
-                    flex: 1, background: '#f0f4ff', color: '#1a3a6b', 
-                    border: '1px solid #dbeafe', borderRadius: '10px', 
-                    padding: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' 
-                  }}
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handlePromote}
-                  style={{ 
-                    flex: 2, background: '#1a3a6b', color: '#fff', 
-                    border: 'none', borderRadius: '10px', padding: '12px', 
-                    fontSize: '14px', fontWeight: '700', cursor: 'pointer' 
-                  }}
-                >
-                  ✅ Confirm Promotion
-                </button>
-              </div>
-            </div>
-          </div>
+      {alert && (
+        <div className={`fixed top-20 right-4 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-medium ${
+          alert.type === "error" ? "bg-red-500" : "bg-green-500"
+        }`}>
+          {alert.msg}
         </div>
       )}
 
-      {/* Top Navbar */}
-      <div style={{ 
-        background: '#1a3a6b', padding: '0 24px', display: 'flex', 
-        alignItems: 'center', justifyContent: 'space-between', height: '56px', 
-        position: 'fixed', top: 0, width: '100%', zIndex: 100, boxSizing: 'border-box' 
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ 
-            background: '#fff', borderRadius: '8px', width: '36px', height: '36px', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center', 
-            fontWeight: '800', color: '#1a3a6b', fontSize: '13px' 
-          }}>
-            CE
-          </div>
-          <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px' }}>CampusEvents</span>
-          <span style={{ color: '#93c5fd', fontSize: '13px' }}>· VIT Pune</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ color: '#93c5fd', fontSize: '13px' }}>🔔</span>
-          <button 
-            onClick={logout} 
-            style={{ 
-              color: '#93c5fd', fontSize: '12px', background: 'none', 
-              border: 'none', cursor: 'pointer', textDecoration: 'none' 
-            }}
-          >
-            Logout
-          </button>
-          <div style={{ 
-            background: '#2563eb', borderRadius: '50%', width: '34px', height: '34px', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center', 
-            color: '#fff', fontWeight: '700', fontSize: '13px' 
-          }}>
-            {deanInfo?.avatar || 'DN'}
-          </div>
-        </div>
-      </div>
+      <div className="max-w-7xl mx-auto px-4 py-8">
 
-      {/* Dean Info Bar */}
-      <div style={{ 
-        background: '#fff', borderBottom: '1px solid #dbeafe', padding: '10px 24px', 
-        marginTop: '56px', display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' 
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ 
-            background: '#1a3a6b', borderRadius: '50%', width: '44px', height: '44px', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center', 
-            color: '#fff', fontWeight: '700', fontSize: '16px' 
-          }}>
-            {deanInfo?.avatar || 'DN'}
-          </div>
-          <div>
-            <p style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '15px' }}>
-              {deanInfo?.name || 'Dean'}
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ 
-                background: '#fef2f2', color: '#dc2626', borderRadius: '20px', 
-                fontSize: '11px', padding: '2px 10px', fontWeight: '600' 
-              }}>
-                👑 Dean
-              </span>
-              <span style={{ color: '#64748b', fontSize: '12px' }}>Full System Access</span>
-            </div>
-          </div>
-        </div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>
-          VIT Pune · <strong style={{ color: '#1a3a6b' }}>Both Campuses</strong>
-        </div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>
-          Email: <strong style={{ color: '#1a3a6b' }}>{deanInfo?.email || 'N/A'}</strong>
-        </div>
-      </div>
-
-      {/* Breadcrumb */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '8px 24px' }}>
-        <p style={{ color: '#64748b', fontSize: '13px' }}>
-          🏠 Home / <span style={{ color: '#1a3a6b', fontWeight: '600' }}>Dean Dashboard</span>
-        </p>
-      </div>
-
-      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px' }}>
-
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px', marginBottom: '24px' }}>
-          {[
-            { label: 'Total Students', value: students?.length || 0, icon: '🎓', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-            { label: 'Coordinators', value: students?.filter(u => u.assignedRole === 'coordinator').length || 0, icon: '🎯', color: '#7c3aed', bg: '#fdf4ff', border: '#e9d5ff' },
-            { label: 'Volunteers', value: students?.filter(u => u.assignedRole === 'volunteer').length || 0, icon: '🙋', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-            { label: 'Pending Approvals', value: pendingEvents?.length || 0, icon: '⏳', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
-            { label: 'Live Events', value: approvedEvents?.length || 0, icon: '✅', color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
-          ].map(s => (
-            <div 
-              key={s.label} 
-              style={{ 
-                background: s.bg, border: `1px solid ${s.border}`, 
-                borderRadius: '16px', textAlign: 'center', padding: '18px' 
-              }}
-            >
-              <div style={{ fontSize: '22px', marginBottom: '4px' }}>{s.icon}</div>
-              <div style={{ color: s.color, fontSize: '24px', fontWeight: '800' }}>{s.value}</div>
-              <div style={{ color: '#64748b', fontSize: '11px' }}>{s.label}</div>
-            </div>
-          ))}
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-800">Dean Dashboard</h1>
+          <p className="text-gray-500 mt-1">
+            Institution-wide analytics & department performance
+          </p>
         </div>
 
         {/* Tabs */}
-        <div style={{ 
-          background: '#fff', border: '1px solid #dbeafe', borderRadius: '12px', 
-          padding: '4px', display: 'inline-flex', gap: '4px', 
-          marginBottom: '20px', flexWrap: 'wrap' 
-        }}>
+        <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200">
           {tabs.map(tab => (
-            <button 
-              key={tab.id} 
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '8px 16px', borderRadius: '8px', fontSize: '13px', 
-                fontWeight: '600', border: 'none', cursor: 'pointer',
-                background: activeTab === tab.id ? '#1a3a6b' : 'transparent',
-                color: activeTab === tab.id ? '#fff' : '#64748b'
-              }}
-            >
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-3 font-semibold border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}>
               {tab.label}
             </button>
           ))}
         </div>
 
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-            <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '16px' }}>📊 Platform Overview</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {[
-                { label: 'Total Students', value: students?.length || 0 },
-                { label: 'Coordinators', value: students?.filter(u => u.assignedRole === 'coordinator').length || 0 },
-                { label: 'Volunteers', value: students?.filter(u => u.assignedRole === 'volunteer').length || 0 },
-                { label: 'Pending Event Approvals', value: pendingEvents?.length || 0 },
-                { label: 'Live Approved Events', value: approvedEvents?.length || 0 },
-              ].map((s, i) => (
-                <div 
-                  key={s.label} 
-                  style={{ 
-                    background: '#f8faff', border: '1px solid #dbeafe', 
-                    borderRadius: '10px', padding: '12px 14px', 
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center' 
-                  }}
-                >
-                  <span style={{ color: '#64748b', fontSize: '13px' }}>{s.label}</span>
-                  <span style={{ color: '#1a3a6b', fontSize: '18px', fontWeight: '800' }}>{s.value}</span>
-                </div>
-              ))}
-            </div>
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600" />
           </div>
-        )}
-
-        {/* Event Approvals Tab */}
-        {activeTab === 'events' && (
-          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-            <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '16px' }}>🎫 Event Approvals</h2>
-            
-            {/* Pending Events - Requires Dean Action */}
-            <div style={{ marginBottom: '32px' }}>
-              <h3 style={{ color: '#d97706', fontSize: '15px', fontWeight: '700', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>⏳ Pending Approval</span>
-                <span style={{ background: '#fef3c7', color: '#d97706', borderRadius: '16px', padding: '2px 10px', fontSize: '12px', fontWeight: 'bold' }}>
-                  {pendingEvents?.length || 0}
-                </span>
-              </h3>
-              {pendingEvents?.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', background: '#f8faff', borderRadius: '12px', border: '1px solid #dbeafe' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-                  <p style={{ fontSize: '14px', fontWeight: '600' }}>No pending events to review</p>
-                  <p style={{ fontSize: '12px', marginTop: '8px' }}>All events have been processed</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {pendingEvents?.map(event => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      role="dean"
-                      onAction={handleAction}
-                    />
+        ) : (
+          <>
+            {/* OVERVIEW TAB */}
+            {activeTab === "overview" && (
+              <div>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  {[
+                    { label: "Total Students", value: summary.totalStudents || 0, icon: "👥", color: "bg-blue-50 border-blue-200" },
+                    { label: "Departments", value: summary.totalDepartments || 0, icon: "🏛️", color: "bg-indigo-50 border-indigo-200" },
+                    { label: "Total Events", value: summary.totalEvents || 0, icon: "📅", color: "bg-green-50 border-green-200" },
+                    { label: "Total Registrations", value: summary.totalRegistrations || 0, icon: "✅", color: "bg-purple-50 border-purple-200" },
+                  ].map(({ label, value, icon, color }) => (
+                    <div key={label} className={`rounded-xl border p-4 ${color}`}>
+                      <div className="text-2xl mb-1">{icon}</div>
+                      <div className="text-2xl font-bold text-gray-800">{value}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+                    </div>
                   ))}
                 </div>
-              )}
-            </div>
 
-            {/* Live/Approved Events - For Oversight (Read-Only) */}
-            <div style={{ borderTop: '1px solid #dbeafe', paddingTop: '24px' }}>
-              <h3 style={{ color: '#059669', fontSize: '15px', fontWeight: '700', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>✅ Live Events</span>
-                <span style={{ background: '#f0fdf4', color: '#059669', borderRadius: '16px', padding: '2px 10px', fontSize: '12px', fontWeight: 'bold' }}>
-                  {approvedEvents?.length || 0}
-                </span>
-              </h3>
-              <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>These events have been approved and are now visible to students</p>
-              {approvedEvents?.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '30px', color: '#64748b', background: '#f8faff', borderRadius: '12px', border: '1px solid #dbeafe' }}>
-                  <p style={{ fontSize: '13px' }}>No approved events yet. Approve pending events above to populate this section.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {approvedEvents?.slice(0, 9).map(event => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      role="dean"
-                      readOnly={true}
-                      onAction={() => {
-                        // Dean can view approved events but cannot modify them
-                        // This is read-only for oversight purposes
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Students Tab */}
-        {activeTab === 'students' && (
-          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ color: '#1a3a6b', fontWeight: '700' }}>👥 All Students</h2>
-              <select 
-                value={campusFilter} 
-                onChange={e => setCampusFilter(e.target.value)}
-                style={{ 
-                  background: '#f8faff', border: '1px solid #cbd5e1', color: '#1a3a6b', 
-                  borderRadius: '8px', padding: '8px 12px', fontSize: '13px', cursor: 'pointer' 
-                }}
-              >
-                <option>All</option>
-                <option>Kondhwa</option>
-                <option>Bibwewadi</option>
-              </select>
-            </div>
-            
-            {filteredUsers?.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
-                <p style={{ fontSize: '14px', fontWeight: '600' }}>No students found</p>
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#f8faff', borderBottom: '2px solid #dbeafe' }}>
-                      {['#', 'Name', 'Email', 'Department', 'Campus', 'Assigned Role', 'Action'].map(h => (
-                        <th 
-                          key={h} 
-                          style={{ 
-                            color: '#1a3a6b', fontSize: '12px', fontWeight: '700', 
-                            padding: '10px 12px', textAlign: 'left' 
-                          }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUsers?.map((s, i) => (
-                      <tr key={s.id} style={{ borderBottom: '1px solid #dbeafe' }}>
-                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '13px' }}>{i + 1}</td>
-                        <td style={{ padding: '10px 12px', color: '#1a3a6b', fontSize: '13px', fontWeight: '600' }}>
-                          {s.name || `${s.firstName || s.first_name || ''} ${s.lastName || s.last_name || ''}`.trim()}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '13px' }}>{s.email}</td>
-                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '13px' }}>{s.department || 'N/A'}</td>
-                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '13px' }}>{s.campus || 'N/A'}</td>
-                        <td style={{ padding: '10px 12px', fontSize: '13px' }}>
-                          {s.assignedRole ? (
-                            <span style={{ 
-                              background: '#dcfce7', color: '#16a34a', 
-                              borderRadius: '6px', fontSize: '11px', 
-                              padding: '3px 10px', fontWeight: '600' 
-                            }}>
-                              {s.assignedRole}
+                {/* Department Participation Bar Chart */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
+                  <h2 className="text-lg font-bold text-gray-700 mb-6">
+                    🏆 Department-wise Participation Rate
+                  </h2>
+                  <div className="space-y-4">
+                    {departments.slice(0, 8).map((dept, i) => (
+                      <div key={dept.department}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm font-semibold text-gray-700">
+                            {dept.department}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-gray-400">
+                              {dept.registrationCount} registrations / {dept.studentCount} students
                             </span>
-                          ) : (
-                            <span style={{ color: '#94a3b8', fontSize: '11px' }}>None</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <button 
-                            onClick={() => setAssignModal(s)}
-                            style={{ 
-                              background: '#1a3a6b', color: '#fff', border: 'none', 
-                              borderRadius: '6px', padding: '6px 12px', 
-                              fontSize: '11px', cursor: 'pointer', fontWeight: '600' 
+                            <span className="text-sm font-bold"
+                              style={{ color: DEPT_COLORS[i % DEPT_COLORS.length] }}>
+                              {dept.participationRate}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-3">
+                          <div
+                            className="h-3 rounded-full transition-all duration-500"
+                            style={{
+                              width: `${Math.min(dept.participationRate, 100)}%`,
+                              backgroundColor: DEPT_COLORS[i % DEPT_COLORS.length]
                             }}
-                          >
-                            Promote
-                          </button>
-                        </td>
-                      </tr>
+                          />
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Assign Tab */}
-        {activeTab === 'assign' && (
-          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-            <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '16px' }}>🎯 Promote Students</h2>
-            <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '20px' }}>
-              Click "Promote" on any student to assign them as a Coordinator or Volunteer
-            </p>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-              {students?.slice(0, 10).map(s => (
-                <div 
-                  key={s.id} 
-                  style={{ 
-                    background: '#f8faff', border: '1px solid #dbeafe', 
-                    borderRadius: '12px', padding: '16px' 
-                  }}
-                >
-                  <p style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>
-                    {s.name || `${s.firstName || s.first_name || ''} ${s.lastName || s.last_name || ''}`.trim()}
-                  </p>
-                  <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '8px' }}>{s.email}</p>
-                  <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>
-                    {s.department || 'N/A'} • {s.campus || 'N/A'}
-                  </p>
-                  <button 
-                    onClick={() => setAssignModal(s)}
-                    style={{ 
-                      background: '#1a3a6b', color: '#fff', border: 'none', 
-                      borderRadius: '8px', padding: '8px 16px', width: '100%', 
-                      fontSize: '12px', cursor: 'pointer', fontWeight: '600' 
-                    }}
-                  >
-                    🎯 Promote
-                  </button>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* Bulk Import Tab */}
-        {activeTab === 'import' && (
-          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-            <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '8px' }}>📤 Bulk Import (XML/Excel)</h2>
-            <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '20px' }}>Upload XML or Excel files to import students or events in bulk</p>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              {/* Import Students */}
-              <div style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '20px' }}>
-                <h3 style={{ color: '#1a3a6b', fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>👥 Import Students</h3>
-                <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '16px' }}>Upload XML file with student data (first_name, last_name, email, password, department)</p>
-                <div style={{ marginBottom: '16px' }}>
-                  <input 
-                    type="file" 
-                    accept=".xml,.xlsx,.xls"
-                    onChange={(e) => setUploadFile(e.target.files[0])}
-                    style={{ 
-                      background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', 
-                      padding: '10px', fontSize: '12px', width: '100%', cursor: 'pointer' 
-                    }}
-                  />
+                {/* Top 3 Departments */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {departments.slice(0, 3).map((dept, i) => (
+                    <div key={dept.department}
+                      className="bg-white rounded-2xl border border-gray-100 p-5">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-2xl">
+                          {i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}
+                        </span>
+                        <div>
+                          <p className="font-bold text-gray-800">{dept.department}</p>
+                          <p className="text-xs text-gray-400">#{i + 1} most active</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Students</span>
+                          <span className="font-semibold">{dept.studentCount}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Registrations</span>
+                          <span className="font-semibold">{dept.registrationCount}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Participation</span>
+                          <span className="font-bold"
+                            style={{ color: DEPT_COLORS[i] }}>
+                            {dept.participationRate}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <button
-                  onClick={async () => {
-                    if (!uploadFile) { alert('Please select a file'); return; }
-                    const formData = new FormData();
-                    formData.append('file', uploadFile);
-                    setUploadStatus('Uploading students...');
-                    try {
-                      const token = localStorage.getItem('token');
-                      const endpoint = uploadFile.name.endsWith('.xml') ? '/api/import/students/xml' : '/api/import/students';
-                      const res = await axios.post(`http://localhost:5000${endpoint}`, formData, {
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
-                      });
-                      setUploadStatus(`✅ Success: ${res.data.imported} imported, ${res.data.skipped} skipped`);
-                      setUploadFile(null);
-                      fetchDashboardData();
-                    } catch (err) {
-                      setUploadStatus(`❌ Error: ${err.response?.data?.message || err.message}`);
-                    }
-                  }}
-                  style={{ 
-                    background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: '8px', 
-                    padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', width: '100%' 
-                  }}
-                >
-                  📤 Upload Students
-                </button>
-              </div>
-
-              {/* Import Events */}
-              <div style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '20px' }}>
-                <h3 style={{ color: '#1a3a6b', fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>📅 Import Events</h3>
-                <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '16px' }}>Upload XML file with event data (title, date, venue, organising_club, target_audience, etc.)</p>
-                <div style={{ marginBottom: '16px' }}>
-                  <input 
-                    type="file" 
-                    accept=".xml,.xlsx,.xls"
-                    onChange={(e) => setUploadFile(e.target.files[0])}
-                    style={{ 
-                      background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', 
-                      padding: '10px', fontSize: '12px', width: '100%', cursor: 'pointer' 
-                    }}
-                  />
-                </div>
-                <button
-                  onClick={async () => {
-                    if (!uploadFile) { alert('Please select a file'); return; }
-                    const formData = new FormData();
-                    formData.append('file', uploadFile);
-                    setUploadStatus('Uploading events...');
-                    try {
-                      const token = localStorage.getItem('token');
-                      const endpoint = uploadFile.name.endsWith('.xml') ? '/api/import/events/xml' : '/api/import/events';
-                      const res = await axios.post(`http://localhost:5000${endpoint}`, formData, {
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
-                      });
-                      setUploadStatus(`✅ Success: ${res.data.imported} imported, ${res.data.skipped} skipped`);
-                      setUploadFile(null);
-                      fetchDashboardData();
-                    } catch (err) {
-                      setUploadStatus(`❌ Error: ${err.response?.data?.message || err.message}`);
-                    }
-                  }}
-                  style={{ 
-                    background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', 
-                    padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', width: '100%' 
-                  }}
-                >
-                  📤 Upload Events
-                </button>
-              </div>
-            </div>
-
-            {/* Upload Status */}
-            {uploadStatus && (
-              <div style={{ 
-                marginTop: '20px', padding: '16px', borderRadius: '10px',
-                background: uploadStatus.startsWith('✅') ? '#f0fdf4' : uploadStatus.startsWith('❌') ? '#fef2f2' : '#fffbeb',
-                border: `1px solid ${uploadStatus.startsWith('✅') ? '#bbf7d0' : uploadStatus.startsWith('❌') ? '#fecaca' : '#fde68a'}`,
-                color: '#1a3a6b', fontSize: '13px', fontWeight: '600'
-              }}>
-                {uploadStatus}
               </div>
             )}
 
-            {/* XML Format Guide */}
-            <div style={{ marginTop: '24px', background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '20px' }}>
-              <h3 style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>📋 XML Format Examples</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <p style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Students XML:</p>
-                  <pre style={{ 
-                    background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', 
-                    padding: '12px', fontSize: '11px', color: '#64748b', overflowX: 'auto' 
-                  }}>{`<students>
-  <student>
-    <first_name>John</first_name>
-    <last_name>Doe</last_name>
-    <email>john@vit.edu</email>
-    <password>password123</password>
-    <department>CSE</department>
-  </student>
-</students>`}</pre>
+            {/* DEPARTMENTS TAB */}
+            {activeTab === "departments" && (
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 mb-4">
+                  Department-wise Performance Analysis
+                </h2>
+                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          {["Rank", "Department", "Students", "Registrations",
+                            "Participation %", "Performance"].map(h => (
+                            <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {departments.map((dept, i) => (
+                          <tr key={dept.department} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-4 text-sm font-bold text-gray-400">
+                              #{i + 1}
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: DEPT_COLORS[i % DEPT_COLORS.length] }} />
+                                <span className="font-semibold text-gray-800">
+                                  {dept.department}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-600">
+                              {dept.studentCount}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-600">
+                              {dept.registrationCount}
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className="font-bold text-sm"
+                                style={{ color: DEPT_COLORS[i % DEPT_COLORS.length] }}>
+                                {dept.participationRate}%
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 w-40">
+                              <div className="w-full bg-gray-100 rounded-full h-2">
+                                <div className="h-2 rounded-full"
+                                  style={{
+                                    width: `${Math.min(dept.participationRate, 100)}%`,
+                                    backgroundColor: DEPT_COLORS[i % DEPT_COLORS.length]
+                                  }} />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div>
-                  <p style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Events XML:</p>
-                  <pre style={{ 
-                    background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', 
-                    padding: '12px', fontSize: '11px', color: '#64748b', overflowX: 'auto' 
-                  }}>{`<events>
-  <event>
-    <title>Hackathon 2025</title>
-    <date>2025-04-15</date>
-    <venue>Auditorium</venue>
-    <organising_club>Tech Club</organising_club>
-    <target_audience>All</target_audience>
-    <seats>100</seats>
-  </event>
-</events>`}</pre>
+
+                {/* Comparison Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                  <div className="bg-green-50 border border-green-100 rounded-2xl p-5">
+                    <h3 className="font-bold text-green-700 mb-3">🏆 Highest Participation</h3>
+                    {departments[0] && (
+                      <>
+                        <p className="text-2xl font-bold text-green-800">
+                          {departments[0].department}
+                        </p>
+                        <p className="text-green-600 text-sm mt-1">
+                          {departments[0].participationRate}% participation rate
+                        </p>
+                        <p className="text-green-500 text-xs mt-1">
+                          {departments[0].registrationCount} registrations from {departments[0].studentCount} students
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
+                    <h3 className="font-bold text-blue-700 mb-3">📊 Average Participation</h3>
+                    <p className="text-2xl font-bold text-blue-800">
+                      {departments.length > 0
+                        ? Math.round(departments.reduce((s, d) => s + d.participationRate, 0) / departments.length)
+                        : 0}%
+                    </p>
+                    <p className="text-blue-600 text-sm mt-1">Across all departments</p>
+                    <p className="text-blue-500 text-xs mt-1">
+                      {summary.totalRegistrations} total registrations
+                    </p>
+                  </div>
+                  <div className="bg-red-50 border border-red-100 rounded-2xl p-5">
+                    <h3 className="font-bold text-red-700 mb-3">⚠️ Needs Attention</h3>
+                    {departments[departments.length - 1] && (
+                      <>
+                        <p className="text-2xl font-bold text-red-800">
+                          {departments[departments.length - 1].department}
+                        </p>
+                        <p className="text-red-600 text-sm mt-1">
+                          {departments[departments.length - 1].participationRate}% participation rate
+                        </p>
+                        <p className="text-red-500 text-xs mt-1">Lowest among all departments</p>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Reports Tab */}
-        {activeTab === 'reports' && (
-          <div style={{ background: '#fff', border: '1px solid #dbeafe', borderRadius: '16px', padding: '24px' }}>
-            <h2 style={{ color: '#1a3a6b', fontWeight: '700', marginBottom: '16px' }}>📈 Reports</h2>
-            <p style={{ color: '#64748b', fontSize: '13px' }}>Reports functionality coming soon...</p>
-          </div>
-        )}
+            {/* EVENTS TAB */}
+            {activeTab === "events" && (
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 mb-4">
+                  Event-wise Department Participation
+                </h2>
+                {eventStats.length === 0 ? (
+                  <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+                    <div className="text-4xl mb-3">📅</div>
+                    <p className="text-gray-500">No event data available yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {eventStats.map(ev => (
+                      <div key={ev.id}
+                        className="bg-white rounded-2xl border border-gray-100 p-5">
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <h3 className="font-bold text-gray-800">{ev.title}</h3>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {ev.category} · {new Date(ev.date).toLocaleDateString()} ·
+                              Total: {ev.totalRegistrations} registered
+                            </p>
+                          </div>
+                          <span className="bg-indigo-100 text-indigo-700 text-xs px-3 py-1 rounded-full font-semibold">
+                            {ev.totalRegistrations} total
+                          </span>
+                        </div>
 
+                        {/* Department breakdown for this event */}
+                        {ev.deptBreakdown?.length > 0 && (
+                          <div className="space-y-2">
+                            {ev.deptBreakdown.map((d, i) => (
+                              <div key={d.department}>
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="text-xs font-medium text-gray-600">
+                                    {d.department}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-400">
+                                      {d.count} students
+                                    </span>
+                                    <span className="text-xs font-bold"
+                                      style={{ color: DEPT_COLORS[i % DEPT_COLORS.length] }}>
+                                      {d.percentage}%
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="w-full bg-gray-100 rounded-full h-2">
+                                  <div className="h-2 rounded-full"
+                                    style={{
+                                      width: `${d.percentage}%`,
+                                      backgroundColor: DEPT_COLORS[i % DEPT_COLORS.length]
+                                    }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* STUDENTS TAB */}
+            {activeTab === "students" && (
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h2 className="text-xl font-bold text-gray-800">
+                    All Students
+                    <span className="ml-2 text-sm font-normal text-gray-400">
+                      ({students.length} shown)
+                    </span>
+                  </h2>
+
+                  {/* Department Filter */}
+                  <select
+                    value={deptFilter}
+                    onChange={e => setDeptFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white">
+                    <option value="all">All Departments</option>
+                    {departments.map(d => (
+                      <option key={d.department} value={d.department}>
+                        {d.department}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {students.length === 0 ? (
+                  <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+                    <div className="text-4xl mb-3">👥</div>
+                    <p className="text-gray-500">No students found</p>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            {["#", "Name", "Email", "Department",
+                              "Year", "Division", "GR Number"].map(h => (
+                              <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {students.map((s, i) => (
+                            <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-sm text-gray-400">{i + 1}</td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-800">
+                                {s.name}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500">{s.email}</td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">
+                                  {s.department || "—"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500">
+                                {s.year || "—"}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500">
+                                {s.division || "—"}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500">
+                                {s.grNumber || "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
-
-      <footer style={{ 
-        background: '#1a3a6b', color: '#93c5fd', textAlign: 'center', 
-        padding: '20px', fontSize: '13px', marginTop: '40px' 
-      }}>
-        © 2025 CampusEvents · Vishwakarma Institute of Technology, Pune
-      </footer>
     </div>
-  )
+  );
 }

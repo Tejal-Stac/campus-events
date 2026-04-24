@@ -15,10 +15,11 @@ import TeamBuilding from './pages/TeamBuilding'
 import FacultyDashboard from './pages/FacultyDashboard'
 import VolunteerDashboard from './pages/VolunteerDashboard'
 import DeanDashboard from './pages/DeanDashboard'
+import HODDashboard from './pages/HODDashboard'
 
 function SmartHomeRoute() {
   const { user, loading } = useAuth()
-  
+
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f0f4ff' }}>
@@ -27,21 +28,21 @@ function SmartHomeRoute() {
       </div>
     )
   }
-  
-  // Auto-redirect: If logged in, go to role-specific dashboard
+
   if (user) {
     const dashboardMap = {
-      student: '/student-dashboard',
+      student:     '/student-dashboard',
       coordinator: '/coordinator-dashboard',
-      volunteer: '/volunteer-dashboard',
-      faculty: '/faculty-dashboard',
-      dean: '/dean-dashboard',
-      admin: '/admin-dashboard',
-      club_head: '/coordinator-dashboard',
+      volunteer:   '/volunteer-dashboard',
+      faculty:     '/faculty-dashboard',
+      hod:         '/hod-dashboard',
+      dean:        '/dean-dashboard',
+      admin:       '/admin-dashboard',
+      club_head:   '/coordinator-dashboard',
     }
     return <Navigate to={dashboardMap[user.role] || '/student-dashboard'} replace />
   }
-  
+
   return <Home />
 }
 
@@ -50,9 +51,8 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Navbar />
-        
         <Routes>
-          {/* Public Routes - No login needed */}
+          {/* Public Routes */}
           <Route path="/" element={<SmartHomeRoute />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -60,122 +60,140 @@ function App() {
           <Route path="/events" element={<Events />} />
           <Route path="/team-building" element={<TeamBuilding />} />
 
-          {/* Protected Routes - Require Authentication */}
-          <Route 
-            path="/dashboard" 
+          {/* HOD Dashboard */}
+          <Route
+            path="/hod-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['hod', 'faculty']}>
+                <HODDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Dean Dashboard */}
+          <Route
+            path="/dean-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['dean', 'admin']}>
+                <DeanDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dean"
+            element={
+              <ProtectedRoute allowedRoles={['dean', 'admin']}>
+                <DeanDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Student */}
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute allowedRoles={['student']}>
                 <StudentDashboard />
               </ProtectedRoute>
-            } 
+            }
           />
-          
-          {/* Standardized Dashboard Routes */}
-          <Route 
-            path="/student-dashboard" 
+          <Route
+            path="/student-dashboard"
             element={
               <ProtectedRoute allowedRoles={['student']}>
                 <StudentDashboard />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/coordinator-dashboard" 
+
+          {/* Coordinator */}
+          <Route
+            path="/coordinator-dashboard"
             element={
               <ProtectedRoute allowedRoles={['coordinator', 'club_head']}>
                 <CoordinatorDashboard />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/admin-dashboard" 
-            element={
-              <ProtectedRoute allowedRoles={['admin', 'dean']}>
-                <AdminPanel />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/volunteer-dashboard" 
-            element={
-              <ProtectedRoute allowedRoles={['volunteer']}>
-                <VolunteerDashboard />
-              </ProtectedRoute>
-            } 
-          />
-          
-          {/* Legacy Routes (kept for backward compatibility) */}
-          <Route 
-            path="/faculty" 
-            element={
-              <ProtectedRoute allowedRoles={['faculty']}>
-                <FacultyDashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/faculty-dashboard" 
-            element={
-              <ProtectedRoute allowedRoles={['faculty']}>
-                <FacultyDashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/coordinator" 
+          <Route
+            path="/coordinator"
             element={
               <ProtectedRoute allowedRoles={['club_head', 'coordinator']}>
                 <CoordinatorDashboard />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/coord-dashboard" 
+          <Route
+            path="/coord-dashboard"
             element={
               <ProtectedRoute allowedRoles={['coordinator', 'club_head']}>
                 <CoordinatorDashboard />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/volunteer" 
-            element={
-              <ProtectedRoute>
-                <VolunteerDashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/admin" 
+
+          {/* Admin */}
+          <Route
+            path="/admin-dashboard"
             element={
               <ProtectedRoute allowedRoles={['admin', 'dean']}>
                 <AdminPanel />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/dean" 
+          <Route
+            path="/admin"
             element={
-              <ProtectedRoute allowedRoles={['dean']}>
-                <DeanDashboard />
+              <ProtectedRoute allowedRoles={['admin', 'dean']}>
+                <AdminPanel />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/dean-dashboard" 
+
+          {/* Volunteer */}
+          <Route
+            path="/volunteer-dashboard"
             element={
-              <ProtectedRoute allowedRoles={['dean']}>
-                <DeanDashboard />
+              <ProtectedRoute allowedRoles={['volunteer']}>
+                <VolunteerDashboard />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/profile" 
+          <Route
+            path="/volunteer"
+            element={
+              <ProtectedRoute>
+                <VolunteerDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Faculty */}
+          <Route
+            path="/faculty-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['faculty', 'hod']}>
+                <FacultyDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faculty"
+            element={
+              <ProtectedRoute allowedRoles={['faculty', 'hod']}>
+                <FacultyDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Profile */}
+          <Route
+            path="/profile"
             element={
               <ProtectedRoute>
                 <Profile />
               </ProtectedRoute>
-            } 
+            }
           />
         </Routes>
       </AuthProvider>
