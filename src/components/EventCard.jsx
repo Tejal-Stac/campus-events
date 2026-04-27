@@ -16,6 +16,23 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
   const [remarks, setRemarks] = useState('')
   const [imageError, setImageError] = useState(false)
   
+  // ✅ LOGISTICAL DATA HELPERS (NEW)
+  const isFreeEvent = !event?.fees || event?.fees === 'Free' || event?.fees === '0'
+  const feeDisplay = isFreeEvent ? 'FREE' : `₹${event?.fees}`
+  const organizingDept = event?.department || event?.organizing_dept || null
+  const guestSpeaker = event?.special_guest || null
+  const amenitiesList = event?.amenities && Array.isArray(event.amenities) ? event.amenities : []
+  
+  // ✅ AMENITIES ICON MAPPING
+  const getAmenityIcon = (amenity) => {
+    if (amenity?.includes('Food')) return '🍕'
+    if (amenity?.includes('Certificate') || amenity?.includes('Gift')) return '🎓'
+    if (amenity?.includes('Duty') || amenity?.includes('Leave')) return '📋'
+    if (amenity?.includes('Transport')) return '🚌'
+    if (amenity?.includes('Accommodation')) return '🏨'
+    return '✨'
+  }
+  
   // Image handling - Category-based fallback system
   const getCategoryImage = (category) => {
     const images = {
@@ -357,23 +374,41 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
       <div className="relative h-48 overflow-hidden">
         <img 
           src={eventImage} 
-          alt={event.title}
+          alt={event?.title || 'Event'}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
           onError={(e) => {
             if (!imageError) {
               setImageError(true)
-              e.target.src = getCategoryImage(event.category)
+              e.target.src = getCategoryImage(event?.category)
             }
           }}
         />
         
         {/* Glassmorphism Overlay Badges */}
-        <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
-          <div className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white backdrop-blur-md bg-white/20 border border-white/30 shadow-lg">
-            {event.saVertical || event.sa_vertical || event.eventType || 'General'}
+        <div className="absolute top-3 left-3 right-3 flex justify-between items-start gap-2">
+          <div className="flex flex-col gap-2">
+            <div className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white backdrop-blur-md bg-white/20 border border-white/30 shadow-lg">
+              {event?.saVertical || event?.sa_vertical || event?.eventType || 'General'}
+            </div>
+            {/* ✅ DEPARTMENT BADGE (NEW) */}
+            {organizingDept && (
+              <div className="px-3 py-1.5 rounded-lg text-xs font-bold text-amber-900 bg-amber-300/90 backdrop-blur-md border border-amber-400 shadow-lg flex items-center gap-1">
+                🏢 {organizingDept}
+              </div>
+            )}
           </div>
-          <div className="px-3 py-1.5 rounded-lg text-xs font-bold text-white backdrop-blur-md bg-gradient-to-r from-indigo-500/80 to-purple-500/80 border border-white/30 shadow-lg">
-            {event.category}
+          <div className="flex flex-col gap-2 items-end">
+            <div className="px-3 py-1.5 rounded-lg text-xs font-bold text-white backdrop-blur-md bg-gradient-to-r from-indigo-500/80 to-purple-500/80 border border-white/30 shadow-lg">
+              {event?.category}
+            </div>
+            {/* ✅ FEES BADGE (NEW) */}
+            <div className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white backdrop-blur-md border border-white/30 shadow-lg ${
+              isFreeEvent 
+                ? 'bg-green-600/90' 
+                : 'bg-blue-600/90'
+            }`}>
+              {isFreeEvent ? '✨ FREE' : `💰 ${feeDisplay}`}
+            </div>
           </div>
         </div>
         
@@ -384,14 +419,39 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
       <div className="p-5">
         {/* Title */}
         <h3 className="text-2xl font-bold text-gray-900 mb-3 line-clamp-2 leading-tight">
-          {event.title}
+          {event?.title}
         </h3>
 
         {/* Description */}
-        {event.description && (
+        {event?.description && (
           <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
             {event.description}
           </p>
+        )}
+
+        {/* ✅ GUEST SPEAKER SECTION (NEW) */}
+        {guestSpeaker && (
+          <div className="mb-4 flex items-start gap-3 p-3 bg-pink-50 rounded-lg border border-pink-200">
+            <span className="text-lg mt-0.5">👤</span>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-pink-700 uppercase tracking-wide">Special Guest</p>
+              <p className="text-sm font-semibold text-pink-900 mt-0.5">{guestSpeaker}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ AMENITIES SECTION (NEW) */}
+        {amenitiesList.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-bold text-gray-700 mb-2">✨ Amenities Included</p>
+            <div className="flex flex-wrap gap-2">
+              {amenitiesList.map((amenity, idx) => (
+                <span key={`amenity-${idx}`} className="text-xs bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full font-semibold border border-amber-300 flex items-center gap-1">
+                  {getAmenityIcon(amenity)} {amenity}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Organized By */}
@@ -400,7 +460,7 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
           <span className="text-xs font-semibold text-indigo-900">
-            {event.organizing_club || event.organising_club || event.organisingClub || 'N/A'}
+            {event?.organizing_club || event?.organising_club || event?.organisingClub || 'N/A'}
           </span>
         </div>
 
@@ -418,14 +478,14 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
           </div>
           
           {/* Time */}
-          {(event.timeFrom || event.time_from) && (
+          {(event?.timeFrom || event?.time_from) && (
             <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg">
               <svg className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-gray-500 font-medium">Time</p>
-                <p className="text-xs font-bold text-gray-900 truncate">{event.timeFrom || event.time_from}</p>
+                <p className="text-xs font-bold text-gray-900 truncate">{event?.timeFrom || event?.time_from}</p>
               </div>
             </div>
           )}
@@ -438,52 +498,56 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
             </svg>
             <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-500 font-medium">Venue</p>
-              <p className="text-xs font-bold text-gray-900 truncate">{event.location || event.venue || 'TBA'}</p>
+              <p className="text-xs font-bold text-gray-900 truncate">{event?.location || event?.venue || 'TBA'}</p>
             </div>
           </div>
           
           {/* Fees */}
-          <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg">
-            <svg className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+          <div className={`flex items-start gap-2 p-2 rounded-lg col-span-2 border ${
+            isFreeEvent 
+              ? 'bg-green-50 border-green-200' 
+              : 'bg-blue-50 border-blue-200'
+          }`}>
+            <span className="text-lg mt-0.5">{isFreeEvent ? '💚' : '💰'}</span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-500 font-medium">Fees</p>
-              <p className={`text-xs font-bold truncate ${event.fees === 'Free' || event.fees === '0' || !event.fees ? 'text-green-600' : 'text-red-600'}`}>
-                {event.fees || 'Free'}
-              </p>
+              <p className={`text-xs font-bold uppercase tracking-wide ${
+                isFreeEvent ? 'text-green-700' : 'text-blue-700'
+              }`}>Registration Fee</p>
+              <p className={`text-sm font-bold ${
+                isFreeEvent ? 'text-green-900' : 'text-blue-900'
+              }`}>{feeDisplay}</p>
             </div>
           </div>
           
           {/* Audience */}
-          {(event.target_audience || event.targetAudience) && (
+          {(event?.target_audience || event?.targetAudience) && (
             <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg col-span-2">
               <svg className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-gray-500 font-medium">Audience</p>
-                <p className="text-xs font-bold text-gray-900">{event.target_audience || event.targetAudience}</p>
+                <p className="text-xs font-bold text-gray-900">{event?.target_audience || event?.targetAudience}</p>
               </div>
             </div>
           )}
           
           {/* Contact */}
-          {event.contact && (
+          {event?.contact && (
             <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg col-span-2">
               <svg className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
               </svg>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-gray-500 font-medium">Contact</p>
-                <p className="text-xs font-bold text-gray-900">{event.contact}</p>
+                <p className="text-xs font-bold text-gray-900">{event?.contact}</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Key Features with Pastel Backgrounds */}
-        {featuresArray.length > 0 && (
+        {featuresArray?.length > 0 && (
           <div className="mb-4">
             <p className="text-xs font-bold text-gray-700 mb-2">✨ Key Features</p>
             <div className="flex flex-wrap gap-1.5">

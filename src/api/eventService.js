@@ -35,6 +35,20 @@ export const eventService = {
   },
 
   /**
+   * Fetch pending events (Dean only)
+   * Returns events with status = 'pending' including faculty info
+   */
+  async fetchPendingEvents() {
+    try {
+      const response = await api.get('/events/pending');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching pending events:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Get single event by ID
    */
   async getEventById(eventId) {

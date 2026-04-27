@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import axios from 'axios'
+import * as HodService from '../api/hodService'
 
 const API = 'http://localhost:5000'
 
@@ -45,6 +46,8 @@ export default function HodDashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [eventStats, setEventStats] = useState(null)
+  const [eventStudents, setEventStudents] = useState([])
+  const [loadingModal, setLoadingModal] = useState(false)
 
   // Role guard
   useEffect(() => {
@@ -69,31 +72,41 @@ export default function HodDashboard() {
 
   const fetchStudents = async () => {
     try {
-      const res = await axios.get(`${API}/api/hod/students`, { headers: headers() })
-      setStudents(res.data.data || [])
+      const res = await HodService.fetchHodStudents()
+      setStudents(res.data || [])
     } catch (e) { console.error('Students fetch error:', e.message) }
   }
 
   const fetchEvents = async (dept = 'All') => {
     try {
-      const params = dept !== 'All' ? `?department=${encodeURIComponent(dept)}` : ''
-      const res = await axios.get(`${API}/api/hod/events${params}`, { headers: headers() })
-      setEvents(res.data.data || [])
+      const res = await HodService.fetchHodEvents(dept)
+      setEvents(res.data || [])
     } catch (e) { console.error('Events fetch error:', e.message) }
   }
 
   const fetchAnalytics = async () => {
     try {
-      const res = await axios.get(`${API}/api/hod/analytics`, { headers: headers() })
-      setAnalytics(res.data)
+      const res = await HodService.fetchHodAnalytics()
+      setAnalytics(res)
     } catch (e) { console.error('Analytics fetch error:', e.message) }
   }
 
   const fetchEventStats = async (eventId) => {
+    setLoadingModal(true)
     try {
-      const res = await axios.get(`${API}/api/hod/event/${eventId}/stats`, { headers: headers() })
-      setEventStats(res.data)
-    } catch (e) { console.error('Event stats error:', e.message) }
+      const [statsRes, studentsRes] = await Promise.all([
+        HodService.fetchEventStats(eventId),
+        HodService.fetchEventStudentList(eventId)
+      ])
+      setEventStats(statsRes)
+      setEventStudents(studentsRes.students || [])
+    } catch (e) {
+      console.error('Event stats error:', e.message)
+      setEventStats(null)
+      setEventStudents([])
+    } finally {
+      setLoadingModal(false)
+    }
   }
 
   const hodDept = user?.department || ''
@@ -144,10 +157,12 @@ export default function HodDashboard() {
 
       {/* ── Event Stats Modal ── */}
       {selectedEvent && eventStats && (
-        <div onClick={() => { setSelectedEvent(null); setEventStats(null) }}
+        <div onClick={() => { setSelectedEvent(null); setEventStats(null); setEventStudents([]) }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(26,58,107,0.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ background: '#fff', borderRadius: '20px', padding: '32px', maxWidth: '560px', width: '100%', boxShadow: '0 24px 64px rgba(26,58,107,0.2)', maxHeight: '80vh', overflowY: 'auto' }}>
+            style={{ background: '#fff', borderRadius: '20px', padding: '32px', maxWidth: '900px', width: '100%', boxShadow: '0 24px 64px rgba(26,58,107,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
+            
+            {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
               <div>
                 <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '18px', marginBottom: '4px' }}>
@@ -155,41 +170,119 @@ export default function HodDashboard() {
                 </h2>
                 <p style={{ color: '#64748b', fontSize: '13px' }}>{eventStats.venue} · {new Date(eventStats.date).toLocaleDateString()}</p>
               </div>
-              <button onClick={() => { setSelectedEvent(null); setEventStats(null) }}
+              <button onClick={() => { setSelectedEvent(null); setEventStats(null); setEventStudents([]) }}
                 style={{ background: '#f0f4ff', border: '1px solid #dbeafe', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', color: '#64748b', fontSize: '13px' }}>
                 ✕ Close
               </button>
             </div>
 
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'center' }}>
+            {/* Total Registrations Card */}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px', marginBottom: '24px', textAlign: 'center' }}>
               <div style={{ color: '#059669', fontSize: '36px', fontWeight: '800' }}>{eventStats.totalRegistered}</div>
               <div style={{ color: '#64748b', fontSize: '13px' }}>Total Registrations</div>
             </div>
 
-            <h3 style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>Department Breakdown</h3>
-            {eventStats.departmentStats?.length === 0 ? (
-              <p style={{ color: '#64748b', fontSize: '13px' }}>No registrations yet.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {eventStats.departmentStats?.map(d => (
-                  <div key={d.department}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '13px', color: '#1a3a6b', fontWeight: d.department === hodDept ? '700' : '400' }}>
-                        {d.department === hodDept ? '★ ' : ''}{d.department}
-                      </span>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: getColor(d.department) }}>
-                        {d.count} ({d.percentage}%)
-                      </span>
+            {/* Department Comparison Section */}
+            {eventStats.comparison && (
+              <div style={{ background: '#fdf4ff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
+                <h3 style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>🏆 Your Department vs Others</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {/* My Department */}
+                  <div style={{ background: '#fff', border: '2px solid #7c3aed', borderRadius: '8px', padding: '12px' }}>
+                    <div style={{ color: '#7c3aed', fontSize: '12px', fontWeight: '700', marginBottom: '8px' }}>★ {eventStats.comparison.myDepartment.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '8px' }}>
+                      <span style={{ color: '#1a3a6b', fontSize: '28px', fontWeight: '800' }}>{eventStats.comparison.myDepartment.count}</span>
+                      <span style={{ color: '#64748b', fontSize: '12px' }}>({eventStats.comparison.myDepartment.percentage}%)</span>
                     </div>
-                    <div style={{ background: '#f0f4ff', borderRadius: '6px', height: '8px', overflow: 'hidden' }}>
-                      <div style={{
-                        width: `${d.percentage}%`, height: '100%',
-                        background: getColor(d.department),
-                        borderRadius: '6px', transition: 'width 0.5s ease'
-                      }} />
+                    <div style={{ background: '#fdf4ff', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(eventStats.comparison.myDepartment.percentage, 100)}%`, height: '100%', background: '#7c3aed' }}/>
                     </div>
                   </div>
-                ))}
+
+                  {/* Other Departments */}
+                  <div style={{ background: '#fff', border: '2px solid #cbd5e1', borderRadius: '8px', padding: '12px' }}>
+                    <div style={{ color: '#64748b', fontSize: '12px', fontWeight: '700', marginBottom: '8px' }}>Other Departments</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '8px' }}>
+                      <span style={{ color: '#1a3a6b', fontSize: '28px', fontWeight: '800' }}>{eventStats.comparison.otherDepartments.count}</span>
+                      <span style={{ color: '#64748b', fontSize: '12px' }}>({eventStats.comparison.otherDepartments.percentage}%)</span>
+                    </div>
+                    <div style={{ background: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(eventStats.comparison.otherDepartments.percentage, 100)}%`, height: '100%', background: '#64748b' }}/>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* All Department Stats */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>📊 Department Breakdown</h3>
+              {eventStats.departmentStats?.length === 0 ? (
+                <p style={{ color: '#64748b', fontSize: '13px' }}>No registrations yet.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {eventStats.departmentStats?.map(d => (
+                    <div key={d.department}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '13px', color: '#1a3a6b', fontWeight: d.isMine ? '700' : '400' }}>
+                          {d.isMine ? '★ ' : ''}{d.department}
+                        </span>
+                        <span style={{ fontSize: '13px', fontWeight: '600', color: d.isMine ? '#7c3aed' : '#64748b' }}>
+                          {d.count} ({d.percentage}%)
+                        </span>
+                      </div>
+                      <div style={{ background: '#f0f4ff', borderRadius: '6px', height: '8px', overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${Math.min(d.percentage, 100)}%`, height: '100%',
+                          background: d.isMine ? '#7c3aed' : getColor(d.department),
+                          borderRadius: '6px', transition: 'width 0.5s ease'
+                        }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Students from HOD's Department */}
+            {eventStudents && eventStudents.length > 0 && (
+              <div>
+                <h3 style={{ color: '#1a3a6b', fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>
+                  👥 {hodDept} Students ({eventStudents.length})
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8faff', borderBottom: '1px solid #dbeafe' }}>
+                        <th style={{ color: '#1a3a6b', fontWeight: '700', padding: '8px 10px', textAlign: 'left' }}>Name</th>
+                        <th style={{ color: '#1a3a6b', fontWeight: '700', padding: '8px 10px', textAlign: 'left' }}>PRN</th>
+                        <th style={{ color: '#1a3a6b', fontWeight: '700', padding: '8px 10px', textAlign: 'left' }}>Email</th>
+                        <th style={{ color: '#1a3a6b', fontWeight: '700', padding: '8px 10px', textAlign: 'left' }}>Year</th>
+                        <th style={{ color: '#1a3a6b', fontWeight: '700', padding: '8px 10px', textAlign: 'left' }}>Registered</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eventStudents.map((student, i) => (
+                        <tr key={student.id} style={{ borderBottom: '1px solid #dbeafe' }}>
+                          <td style={{ padding: '8px 10px', color: '#1a3a6b', fontWeight: '600' }}>{student.name}</td>
+                          <td style={{ padding: '8px 10px', color: '#64748b' }}>{student.prn || '—'}</td>
+                          <td style={{ padding: '8px 10px', color: '#64748b', fontSize: '12px' }}>{student.email}</td>
+                          <td style={{ padding: '8px 10px', color: '#64748b' }}>{student.year || '—'}</td>
+                          <td style={{ padding: '8px 10px', color: '#64748b', fontSize: '12px' }}>
+                            {new Date(student.registeredAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {eventStudents && eventStudents.length === 0 && (
+              <div style={{ background: '#ffe4f3', border: '1px solid #fbcfe8', borderRadius: '8px', padding: '16px', textAlign: 'center', color: '#be185d' }}>
+                <div style={{ fontSize: '24px', marginBottom: '8px' }}>👥</div>
+                <p style={{ fontSize: '13px', fontWeight: '600' }}>No students from {hodDept} registered for this event</p>
               </div>
             )}
           </div>
@@ -283,9 +376,10 @@ export default function HodDashboard() {
                 <div style={{ position: 'relative', width: '120px', height: '120px', flexShrink: 0 }}>
                   <svg width="120" height="120" viewBox="0 0 120 120">
                     <circle cx="60" cy="60" r="50" fill="none" stroke="#f0f4ff" strokeWidth="14"/>
+                    {/* Cap visual at 100% but use true value for display */}
                     <circle cx="60" cy="60" r="50" fill="none"
                       stroke="#1a3a6b" strokeWidth="14"
-                      strokeDasharray={`${(analytics?.summary?.participationRate || 0) * 3.14} 314`}
+                      strokeDasharray={`${Math.min(analytics?.summary?.participationRate || 0, 100) * 3.14} 314`}
                       strokeDashoffset="78.5" strokeLinecap="round" transform="rotate(-90 60 60)"/>
                     <text x="60" y="56" textAnchor="middle" fill="#1a3a6b" fontSize="20" fontWeight="700">
                       {analytics?.summary?.participationRate || 0}%
@@ -307,14 +401,19 @@ export default function HodDashboard() {
                 </div>
               </div>
 
-              {/* Participation Bar */}
+              {/* Participation Bar - Cap visual at 100% but show true value */}
               <div style={{ marginTop: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <span style={{ fontSize: '12px', color: '#64748b' }}>Active</span>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>Inactive</span>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>
+                    {analytics?.summary?.participationRate && analytics?.summary?.participationRate > 100 
+                      ? `${analytics?.summary?.participationRate}% (capped at 100% visually)` 
+                      : 'Inactive'
+                    }
+                  </span>
                 </div>
                 <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', height: '14px' }}>
-                  <div style={{ width: `${analytics?.summary?.participationRate || 0}%`, background: '#1a3a6b', transition: 'width 0.5s' }}/>
+                  <div style={{ width: `${Math.min(analytics?.summary?.participationRate || 0, 100)}%`, background: '#1a3a6b', transition: 'width 0.5s' }}/>
                   <div style={{ flex: 1, background: '#e2e8f0' }}/>
                 </div>
               </div>

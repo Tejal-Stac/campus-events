@@ -32,6 +32,29 @@ const getAllEvents = async (req, res) => {
   }
 }
 
+const getPendingEvents = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT e.id, e.title, e.description, e.date, e.venue, e.category,
+              e.event_type, e.status, e.created_at, e.updated_at,
+              e.seats, e.fees, e.department, e.special_guest, e.amenities,
+              u.first_name as faculty_first_name, 
+              u.last_name as faculty_last_name,
+              u.email as faculty_email,
+              COUNT(DISTINCT r.id)::int as registered_count
+       FROM events e
+       LEFT JOIN users u ON e.faculty_id = u.id
+       LEFT JOIN registrations r ON e.id = r.event_id
+       WHERE e.status = 'pending'
+       GROUP BY e.id, u.id
+       ORDER BY e.created_at DESC`
+    )
+    res.json({ success: true, data: result.rows })
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error', error: err.message })
+  }
+}
+
 const getEventById = async (req, res) => {
   try {
     const result = await pool.query(
@@ -56,7 +79,8 @@ const createEvent = async (req, res) => {
     title, organisingClub, saVertical, date, day,
     timeFrom, timeTo, venue, onlineLink, targetAudience,
     expectedCount, seats, fees, contact, category,
-    keyFeatures, desc, event_type, allow_external, payment_qr_url
+    keyFeatures, desc, event_type, allow_external, payment_qr_url,
+    organizing_dept, special_guest, amenities
   } = req.body
 
   if (!title || !date || !venue) {
@@ -80,14 +104,20 @@ const createEvent = async (req, res) => {
       ? featuresString.split(',').map(k => k.trim()).filter(k => k)
       : []
 
+    // Handle amenities as JSON array
+    let amenitiesArray = null
+    if (amenities && Array.isArray(amenities) && amenities.length > 0) {
+      amenitiesArray = JSON.stringify(amenities)
+    }
+
     const result = await pool.query(
       `INSERT INTO events
         (title, organising_club, sa_vertical, date, day,
          time_from, time_to, venue, online_link, target_audience,
          expected_count, seats, fees, contact, category,
          key_features, description, event_type, faculty_id, status,
-         allow_external, payment_qr_url)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pending',$20,$21)
+         allow_external, payment_qr_url, department, special_guest, amenities)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pending',$20,$21,$22,$23,$24)
        RETURNING *`,
       [
         title, organisingClub || null, saVertical || null, date, day || null,
@@ -95,10 +125,12 @@ const createEvent = async (req, res) => {
         targetAudience || 'All', expectedCount || 0, seats || 100,
         fees || 'Free', contact || null, category || 'General',
         JSON.stringify(featuresArray), desc || null, resolvedEventType,
-        req.user.id, allow_external || false, payment_qr_url || null
+        req.user.id, allow_external || false, payment_qr_url || null,
+        organizing_dept || null, special_guest || null, amenitiesArray
       ]
     )
 
+    console.log(`✅ Event created: "${title}" by user ${req.user.id} - Department: ${organizing_dept || 'Not specified'}`)
     res.status(201).json({
       success: true,
       message: 'Event submitted for Dean approval!',
@@ -125,14 +157,25 @@ const updateEventStatus = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' })
     }
 
-    const result = await pool.query(
-      'UPDATE events SET status = $1 WHERE id = $2 RETURNING *',
-      [status, req.params.id]
-    )
-    console.log(`✅ Event ${req.params.id} status updated to '${status}' by user ${req.user.id}`)
-    res.json({ success: true, message: `Event ${status}!`, data: result.rows[0] })
+    // Simple status update - updated_at is automatically set by database trigger
+    const query = 'UPDATE events SET status = $1 WHERE id = $2 RETURNING *'
+    const params = [status, req.params.id]
+
+    const result = await pool.query(query, params)
+    
+    if (status === 'approved') {
+      console.log(`✅ EVENT APPROVED: Event ${req.params.id} (${result.rows[0].title}) approved by user ${req.user.id} - updated_at: ${result.rows[0].updated_at}`)
+    } else if (status === 'rejected') {
+      console.log(`❌ EVENT REJECTED: Event ${req.params.id} (${result.rows[0].title}) rejected by user ${req.user.id}`)
+    } else {
+      console.log(`⚙️ Event ${req.params.id} status updated to '${status}' by user ${req.user.id}`)
+    }
+    
+    res.json({ success: true, message: `Event ${status} successfully!`, data: result.rows[0] })
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error', error: err.message })
+    console.error(`🔴 UPDATE EVENT STATUS ERROR (ID: ${req.params.id}, Status: ${req.body.status}):`, err.message)
+    console.error('Full Error:', err)
+    res.status(500).json({ success: false, message: 'Server error updating event status', error: err.message })
   }
 }
 
@@ -363,7 +406,7 @@ const rejectNonVitian = async (req, res) => {
 }
 
 module.exports = {
-  getAllEvents, getEventById, createEvent,
+  getAllEvents, getPendingEvents, getEventById, createEvent,
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,

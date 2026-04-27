@@ -27,7 +27,20 @@ export default function FacultyDashboard() {
   const [selectedType, setSelectedType] = useState("All");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [activeTab, setActiveTab] = useState("overview");
-  const [newEvent, setNewEvent] = useState({ title: '', date: '', category: '', seats: '', venue: '', desc: '', event_type: 'Intracollege', allow_external: false });
+  const [newEvent, setNewEvent] = useState({ 
+    title: '', 
+    date: '', 
+    category: '', 
+    seats: '', 
+    venue: '', 
+    desc: '', 
+    event_type: 'Intracollege', 
+    allow_external: false,
+    organizing_dept: user?.department || '',
+    fees: '',
+    special_guest: '',
+    amenities: []
+  });
   const [creating, setCreating] = useState(false);
   const [alert, setAlert] = useState(null);
   const [viewingParticipants, setViewingParticipants] = useState(null);
@@ -42,6 +55,15 @@ export default function FacultyDashboard() {
   }, [user, navigate]);
 
   const updateEvent = (field, value) => setNewEvent(prev => ({ ...prev, [field]: value }));
+
+  const toggleAmenity = (amenity) => {
+    setNewEvent(prev => ({
+      ...prev,
+      amenities: prev.amenities.includes(amenity)
+        ? prev.amenities.filter(a => a !== amenity)
+        : [...prev.amenities, amenity]
+    }));
+  };
 
   const showAlert = (message, type = "success") => {
     setAlert({ message, type });
@@ -156,12 +178,24 @@ export default function FacultyDashboard() {
         event_type: newEvent.event_type,
         allow_external: newEvent.allow_external,
         organisingClub: user?.organisingClub || user?.organising_club || 'Faculty Department',
+        // New fields
+        organizing_dept: newEvent.organizing_dept || user?.department || '',
+        fees: newEvent.fees || 'Free',
+        special_guest: newEvent.special_guest || null,
+        amenities: newEvent.amenities.length > 0 ? newEvent.amenities : null,
       };
       
       const response = await eventService.createEvent(eventPayload);
       
       showAlert("✅ Event created successfully! Awaiting Dean approval.", "success");
-      setNewEvent({ title: '', date: '', category: '', seats: '', venue: '', desc: '', event_type: 'Intracollege', allow_external: false });
+      setNewEvent({ 
+        title: '', date: '', category: '', seats: '', venue: '', desc: '', 
+        event_type: 'Intracollege', allow_external: false,
+        organizing_dept: user?.department || '',
+        fees: '',
+        special_guest: '',
+        amenities: []
+      });
       setActiveTab("overview");
       fetchEvents();
     } catch (err) {
@@ -669,6 +703,98 @@ export default function FacultyDashboard() {
                 <span className="text-sm font-semibold text-gray-700">Allow External/Non-VIT Registrations</span>
               </label>
               <p className="text-xs text-gray-500 mt-1 ml-8">If checked, non-VIT students can register for this event</p>
+            </div>
+
+            {/* Logistics & Amenities Section */}
+            <div className="mb-6 p-5 border border-slate-200 rounded-lg bg-slate-50">
+              <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <span>⚙️ Logistics & Amenities</span>
+              </h3>
+
+              {/* Organizing Department */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Organizing Department</label>
+                <select
+                  value={newEvent.organizing_dept}
+                  onChange={(e) => updateEvent('organizing_dept', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="">Select department</option>
+                  <option value="Computer Science">Computer Science</option>
+                  <option value="Electronics">Electronics</option>
+                  <option value="Mechanical">Mechanical</option>
+                  <option value="Civil">Civil</option>
+                  <option value="Electrical">Electrical</option>
+                  <option value="Information Technology">Information Technology</option>
+                  <option value="Business Administration">Business Administration</option>
+                  <option value="Multi-Department">Multi-Department Event</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Default: Your department ({user?.department || 'Not set'})</p>
+              </div>
+
+              {/* Registration Fees */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Registration Fees</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-2.5 text-gray-600 font-semibold">₹</span>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    min="0"
+                    step="10"
+                    value={newEvent.fees}
+                    onChange={(e) => updateEvent('fees', e.target.value)}
+                    className="w-full pl-7 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Leave blank or 0 for free event</p>
+              </div>
+
+              {/* Special Guest */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Special Guest/Speaker (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dr. John Doe, CEO of TechCorp"
+                  value={newEvent.special_guest}
+                  onChange={(e) => updateEvent('special_guest', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Amenities Checkboxes */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Amenities & Incentives</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={newEvent.amenities.includes('Food/Refreshments')}
+                      onChange={() => toggleAmenity('Food/Refreshments')}
+                      className="w-4 h-4 text-emerald-600 rounded"
+                    />
+                    <span className="text-sm text-gray-700">🍔 Food/Refreshments</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={newEvent.amenities.includes('Certificates/Gifts')}
+                      onChange={() => toggleAmenity('Certificates/Gifts')}
+                      className="w-4 h-4 text-emerald-600 rounded"
+                    />
+                    <span className="text-sm text-gray-700">🎁 Certificates/Gifts</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={newEvent.amenities.includes('Duty Leave/Attendance')}
+                      onChange={() => toggleAmenity('Duty Leave/Attendance')}
+                      className="w-4 h-4 text-emerald-600 rounded"
+                    />
+                    <span className="text-sm text-gray-700">📋 Duty Leave/Attendance</span>
+                  </label>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3">

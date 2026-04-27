@@ -73,6 +73,8 @@ CREATE TABLE public.events (
     total_seats INTEGER,
     seats INTEGER,
     volunteer_count INTEGER DEFAULT 0,
+    special_guest VARCHAR(255),
+    amenities JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -112,3 +114,8 @@ ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS college_name VARCHAR(255),
   ADD COLUMN IF NOT EXISTS college_email VARCHAR(255),
   ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT TRUE;
+
+-- 8. Add Event Logistics & Amenities Columns
+ALTER TABLE public.events
+  ADD COLUMN IF NOT EXISTS special_guest VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS amenities JSONB;

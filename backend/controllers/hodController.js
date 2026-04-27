@@ -206,10 +206,11 @@ const getHodAnalytics = async (req, res) => {
 }
 
 // GET /api/hod/event/:id/stats
-// Returns detailed stats for a specific event
+// Returns detailed stats for a specific event (department comparison)
 const getEventStats = async (req, res) => {
   try {
     const { id } = req.params
+    const hodDept = req.user.department
 
     const eventRes = await pool.query(
       `SELECT e.*, COUNT(DISTINCT r.id) AS total_registered
@@ -226,6 +227,7 @@ const getEventStats = async (req, res) => {
     const event = eventRes.rows[0]
     const total = parseInt(event.total_registered) || 0
 
+    // ── Department-wise breakdown ──
     const deptStats = await pool.query(
       `SELECT u.department, COUNT(*) AS count
        FROM registrations r
@@ -236,6 +238,16 @@ const getEventStats = async (req, res) => {
       [id]
     )
 
+    // ── HOD's department comparison ──
+    const hodDeptRes = await pool.query(
+      `SELECT COUNT(*) AS count FROM registrations r
+       JOIN users u ON u.id = r.user_id
+       WHERE r.event_id = $1 AND LOWER(u.department) = LOWER($2)`,
+      [id, hodDept]
+    )
+    const hodDeptCount = parseInt(hodDeptRes.rows[0].count) || 0
+    const otherDeptCount = total - hodDeptCount
+
     res.json({
       success: true,
       eventId: parseInt(id),
@@ -243,10 +255,23 @@ const getEventStats = async (req, res) => {
       totalRegistered: total,
       venue: event.venue,
       date: event.date,
+      hodDepartment: hodDept,
+      comparison: {
+        myDepartment: {
+          name: hodDept,
+          count: hodDeptCount,
+          percentage: total > 0 ? Math.round((hodDeptCount / total) * 100) : 0
+        },
+        otherDepartments: {
+          count: otherDeptCount,
+          percentage: total > 0 ? Math.round((otherDeptCount / total) * 100) : 0
+        }
+      },
       departmentStats: deptStats.rows.map(d => ({
         department: d.department,
         count: parseInt(d.count),
-        percentage: total > 0 ? Math.round((parseInt(d.count) / total) * 100) : 0
+        percentage: total > 0 ? Math.round((parseInt(d.count) / total) * 100) : 0,
+        isMine: d.department?.toLowerCase() === hodDept?.toLowerCase()
       }))
     })
   } catch (err) {
@@ -255,7 +280,54 @@ const getEventStats = async (req, res) => {
   }
 }
 
-module.exports = { getHodStudents, getHodEvents, getHodAnalytics, getEventStats }
+// GET /api/hod/event/:id/students
+// Returns students from HOD's department who registered for this event
+const getEventStudentList = async (req, res) => {
+  try {
+    const { id } = req.params
+    const hodDept = req.user.department
+
+    if (!hodDept) {
+      return res.status(400).json({ success: false, message: 'HOD department not found in token' })
+    }
+
+    // Fetch students from HOD's dept who registered for this event
+    const result = await pool.query(
+      `SELECT 
+         u.id, u.first_name, u.last_name, u.email, u.gr_number, 
+         u.department, u.year, u.division, u.phone,
+         r.registered_at
+       FROM registrations r
+       JOIN users u ON u.id = r.user_id
+       WHERE r.event_id = $1 AND LOWER(u.department) = LOWER($2)
+       ORDER BY r.registered_at DESC`,
+      [id, hodDept]
+    )
+
+    res.json({
+      success: true,
+      eventId: parseInt(id),
+      hodDepartment: hodDept,
+      studentCount: result.rows.length,
+      students: result.rows.map(u => ({
+        id: u.id,
+        name: `${u.first_name || ''} ${u.last_name || ''}`.trim(),
+        email: u.email,
+        prn: u.gr_number,
+        year: u.year,
+        division: u.division,
+        department: u.department,
+        phone: u.phone,
+        registeredAt: u.registered_at
+      }))
+    })
+  } catch (err) {
+    console.error('EVENT STUDENTS ERROR:', err.message)
+    res.status(500).json({ success: false, message: err.message })
+  }
+}
+
+module.exports = { getHodStudents, getHodEvents, getHodAnalytics, getEventStats, getEventStudentList }
 
 
 // ============================================================

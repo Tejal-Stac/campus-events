@@ -6,7 +6,7 @@ const auth = require('../middleware/auth')
 const { isDean, isFacultyOrDean } = require('../middleware/auth')
 const optionalAuth = require('../middleware/optionalAuth')
 const {
-  getAllEvents, getEventById, createEvent,
+  getAllEvents, getPendingEvents, getEventById, createEvent,
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,
@@ -14,6 +14,7 @@ const {
 } = require('../controllers/eventController')
 
 router.get('/', getAllEvents)
+router.get('/pending', auth, isDean, getPendingEvents)
 router.get('/coordinator/stats', auth, getCoordinatorStats)
 router.get('/coordinator/volunteers', auth, getCoordinatorVolunteers)
 router.get('/coordinator/pending-approvals', auth, getPendingApprovals)
