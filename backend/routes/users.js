@@ -329,4 +329,61 @@ router.put('/:id', auth, async (req, res) => {
   }
 })
 
+// GET /api/users/departmental - HOD-only: get students and faculty in their department
+router.get('/departmental/:type', auth, async (req, res) => {
+  // Only HOD can access this
+  if (req.user.role !== 'hod') {
+    return res.status(403).json({ success: false, message: 'Only HOD can access departmental data' })
+  }
+
+  const hodDepartment = req.user.department
+  if (!hodDepartment) {
+    return res.status(400).json({ success: false, message: 'HOD department not found' })
+  }
+
+  const type = req.params.type // 'students' or 'faculty'
+  const validTypes = ['students', 'faculty']
+  if (!validTypes.includes(type)) {
+    return res.status(400).json({ success: false, message: 'Invalid type. Use "students" or "faculty"' })
+  }
+
+  try {
+    const roleQuery = type === 'students' ? 'student' : 'faculty'
+    const result = await pool.query(
+      `SELECT id, first_name, last_name, email, role, department,
+              division, year, gr_number, phone, designation, coordinator_type, created_at
+       FROM users
+       WHERE role = $1 AND department = $2
+       ORDER BY first_name, last_name`,
+      [roleQuery, hodDepartment]
+    )
+
+    const data = result.rows.map(u => ({
+      id: u.id,
+      name: `${u.first_name || ''} ${u.last_name || ''}`.trim(),
+      email: u.email,
+      role: u.role,
+      department: u.department,
+      division: u.division,
+      year: u.year,
+      grNumber: u.gr_number,
+      phone: u.phone,
+      designation: u.designation,
+      coordinatorType: u.coordinator_type,
+      createdAt: u.created_at
+    }))
+
+    res.json({
+      success: true,
+      department: hodDepartment,
+      type,
+      total: data.length,
+      data
+    })
+  } catch (err) {
+    console.error('DEPARTMENTAL QUERY ERROR:', err.message)
+    res.status(500).json({ success: false, message: 'Server error', error: err.message })
+  }
+})
+
 module.exports = router

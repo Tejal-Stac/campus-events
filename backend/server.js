@@ -1,6 +1,8 @@
 const express = require('express')
 const cors = require('cors')
 require('dotenv').config()
+const auth = require('./middleware/auth')
+const { verifyStudentRegistration } = require('./controllers/eventController')
 
 const app = express()
 
@@ -16,6 +18,7 @@ app.use((req, res, next) => {
 // API routes
 app.use('/api/auth', require('./routes/auth'))
 app.use('/api/events', require('./routes/events'))
+app.patch('/api/registrations/:registrationId/verify', auth, verifyStudentRegistration)
 app.use('/api/users', require('./routes/users'))
 app.use('/api/certificates', require('./routes/certificates'))
 app.use('/api/import', require('./routes/import'))

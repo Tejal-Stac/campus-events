@@ -145,7 +145,8 @@ const login = async (req, res) => {
  
     // ✅ HOD registers as faculty → both cards work
     const allowedRoleMap = {
-      student:     ['student'],
+      student:     ['student', 'club_president'],
+      club_president: ['club_president', 'student'],
       faculty:     ['faculty', 'hod'],
       hod:         ['hod', 'faculty'],
       coordinator: ['coordinator'],
@@ -176,22 +177,23 @@ const login = async (req, res) => {
       college_type: collegeType,
       college_name: user.college_name || null,
       is_vitian: collegeType === 'vitian',
+      coordinator_type: user.coordinator_type || 'none',
     }
- 
+
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: userRole, department: user.department },
+      { id: user.id, email: user.email, role: userRole, department: user.department, coordinator_type: user.coordinator_type || 'none' },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     )
- 
-    console.log('✅ Login:', userResponse.email, '| Role:', userResponse.role, '| Dept:', userResponse.department)
- 
+
+    console.log('✅ Login:', userResponse.email, '| Role:', userResponse.role, '| Dept:', userResponse.department, '| Coordinator:', userResponse.coordinator_type)
+
     res.json({
       success: true,
       message: 'Login successful!',
       data: { token, user: userResponse }
     })
- 
+
   } catch (err) {
     console.error('LOGIN ERROR:', err.message)
     res.status(500).json({ success: false, message: err.message })
@@ -249,10 +251,11 @@ const getProfile = async (req, res) => {
       college_name: user.college_name,
       collegeName: user.college_name,
       is_vitian: collegeType === 'vitian',
+      coordinator_type: user.coordinator_type || 'none',
       points: 0,
       createdAt: user.created_at
     }
- 
+
     res.json({ success: true, data: userResponse })
   } catch (err) {
     console.error('GET PROFILE ERROR:', err.message)

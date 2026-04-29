@@ -5,6 +5,7 @@ import eventService from "../api/eventService";
 import Navbar from "../components/Navbar";
 import EventCard from "../components/EventCard";
 import { Users, Mail, Phone, Calendar, X, AlertCircle } from "lucide-react";
+import axios from "axios";
 
 const EVENT_TYPE_STYLES = {
   National:     "bg-red-100 text-red-700 border-red-200",
@@ -19,7 +20,7 @@ const EVENT_TYPES = ["All", "National", "Intercollege", "Intracollege", "Departm
 const CATEGORIES = ["All", "Hackathon", "Seminar", "Workshop", "Cultural", "Sports", "Technical"];
 
 export default function FacultyDashboard() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   const [events, setEvents] = useState([]);
@@ -27,6 +28,7 @@ export default function FacultyDashboard() {
   const [selectedType, setSelectedType] = useState("All");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [activeTab, setActiveTab] = useState("overview");
+  const [editingEventId, setEditingEventId] = useState(null);
   const [newEvent, setNewEvent] = useState({ 
     title: '', 
     date: '', 
@@ -47,6 +49,8 @@ export default function FacultyDashboard() {
   const [participants, setParticipants] = useState([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [participantsError, setParticipantsError] = useState(null);
+  const [rejectedEvents, setRejectedEvents] = useState([]);
+  const [verifyingRegistrationId, setVerifyingRegistrationId] = useState(null);
 
   useEffect(() => {
     if (user && user.role !== "faculty") {
@@ -160,6 +164,27 @@ export default function FacultyDashboard() {
     }
   };
 
+  const handleVerifyStudent = async (registrationId) => {
+    try {
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/events/registrations/${registrationId}/verify`,
+        { verification_status: 'verified' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      showAlert('✅ Student verified successfully!', 'success');
+      
+      // Update participants list
+      const updatedParticipants = participants.map(p => 
+        p.id === registrationId ? { ...p, verification_status: 'verified' } : p
+      );
+      setParticipants(updatedParticipants);
+      setVerifyingRegistrationId(null);
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Failed to verify student';
+      showAlert(errorMsg, 'error');
+    }
+  };
+
   const handleCreateEvent = async () => {
     if (!newEvent.title || !newEvent.date || !newEvent.venue) {
       showAlert("Please fill in all required fields (Title, Date, Venue)", "error");
@@ -185,9 +210,23 @@ export default function FacultyDashboard() {
         amenities: newEvent.amenities.length > 0 ? newEvent.amenities : null,
       };
       
-      const response = await eventService.createEvent(eventPayload);
+      // [FIX] Handle both creating new events and resubmitting rejected events
+      let response;
+      if (editingEventId) {
+        // Resubmitting a rejected event - update it and clear rejection remarks
+        response = await eventService.updateEvent(editingEventId, {
+          ...eventPayload,
+          status: 'pending'  // Reset to pending for re-approval
+        });
+        showAlert("✅ Event updated and resubmitted! Awaiting coordinator review.", "success");
+        setEditingEventId(null);
+      } else {
+        // Creating a new event
+        response = await eventService.createEvent(eventPayload);
+        showAlert("✅ Event created successfully! Awaiting coordinator approval.", "success");
+      }
       
-      showAlert("✅ Event created successfully! Awaiting Dean approval.", "success");
+      // Reset form and refresh events list
       setNewEvent({ 
         title: '', date: '', category: '', seats: '', venue: '', desc: '', 
         event_type: 'Intracollege', allow_external: false,
@@ -197,11 +236,15 @@ export default function FacultyDashboard() {
         amenities: []
       });
       setActiveTab("overview");
-      fetchEvents();
+      // Refresh events to see updated status
+      const updatedEvents = events.map(e => 
+        e.id === editingEventId ? { ...e, status: 'pending', coordinator_remarks: null } : e
+      );
+      setEvents(updatedEvents);
     } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || "Failed to create event";
+      const errorMsg = err.response?.data?.message || err.message || "Failed to save event";
       showAlert(errorMsg, "error");
-      console.error('Event creation error:', err);
+      console.error('Event save error:', err);
     } finally {
       setCreating(false);
     }
@@ -224,11 +267,40 @@ export default function FacultyDashboard() {
     }
   }, [user, navigate]);
 
+  // [FIX] Fetch events with all statuses (approved, pending, rejected) to show rejected events to faculty
   useEffect(() => {
-    eventService.getAllEvents()
-      .then(setEvents)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    const fetchAllStatusEvents = async () => {
+      try {
+        // Fetch approved events (default)
+        const approvedEvents = await eventService.getAllEvents({ status: 'approved' });
+        // Fetch pending events (awaiting coordinator approval)
+        const pendingEvents = await eventService.getAllEvents({ status: 'pending' });
+        // Fetch rejected events (so faculty can see feedback and resubmit)
+        const rejectedEvents = await eventService.getAllEvents({ status: 'rejected' });
+        
+        // Combine all events from all statuses
+        const allEvents = [
+          ...(approvedEvents || []),
+          ...(pendingEvents || []),
+          ...(rejectedEvents || [])
+        ];
+        
+        // Remove duplicates by event ID
+        const uniqueEvents = Array.from(
+          new Map(allEvents.map(e => [e.id, e])).values()
+        );
+        
+        setEvents(uniqueEvents);
+        console.log(`Loaded ${uniqueEvents.length} total events (approved: ${approvedEvents?.length || 0}, pending: ${pendingEvents?.length || 0}, rejected: ${rejectedEvents?.length || 0})`);
+      } catch (err) {
+        console.error('Error fetching events:', err);
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAllStatusEvents();
   }, []);
 
   const filteredEvents = events.filter(e => {
@@ -496,6 +568,7 @@ export default function FacultyDashboard() {
           {[
             { id: 'overview', label: '📊 Overview' },
             { id: 'events', label: '📅 All Events' },
+            { id: 'students', label: '👥 My Students' },
             { id: 'create', label: '➕ Create Event' },
           ].map(tab => (
             <button
@@ -812,6 +885,153 @@ export default function FacultyDashboard() {
                 {creating ? 'Creating...' : '🚀 Create & Submit'}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* My Students Tab - Phase 2 */}
+        {activeTab === 'students' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">👥 My Students</h2>
+              <p className="text-gray-500">Verify student registrations for your events</p>
+            </div>
+
+            {events.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
+                <div className="text-4xl mb-4">📭</div>
+                <p className="text-gray-500 text-lg font-medium">No events created yet</p>
+                <p className="text-gray-400 text-sm mt-2">Create an event to see registered students here</p>
+              </div>
+            ) : (
+              events.map(event => (
+                <div key={event.id} className="bg-white rounded-2xl border border-gray-100 p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">{event.title}</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        📅 {new Date(event.date).toLocaleDateString('en-IN')} • 📍 {event.venue}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {event.status === 'rejected' && (
+                        <span className="bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold">
+                          ❌ Rejected
+                        </span>
+                      )}
+                      {event.status === 'approved' && (
+                        <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-semibold">
+                          ✅ Approved
+                        </span>
+                      )}
+                      {event.status === 'pending' && (
+                        <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-semibold">
+                          ⏳ Pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Show rejection reason if rejected */}
+                  {event.status === 'rejected' && event.coordinator_remarks && (
+                    <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg">
+                      <p className="text-sm font-semibold text-rose-900">💬 Coordinator Feedback:</p>
+                      <p className="text-sm text-rose-800 mt-1">{event.coordinator_remarks}</p>
+                      <button
+                        onClick={() => {
+                          setEditingEventId(event.id);
+                          setNewEvent({
+                            ...newEvent,
+                            title: event.title,
+                            date: event.date,
+                            category: event.category,
+                            seats: String(event.seats),
+                            venue: event.venue,
+                            desc: event.description,
+                            event_type: event.event_type,
+                          });
+                          setActiveTab('create');
+                        }}
+                        className="mt-2 px-4 py-2 bg-rose-600 text-white text-sm rounded-lg font-semibold hover:bg-rose-700 transition"
+                      >
+                        ✏️ Edit & Resubmit
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Participants Table */}
+                  {participants.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50 rounded-lg">
+                      <p className="text-gray-500">No students registered yet</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Student Name</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Phone</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Receipt</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {participants.map(participant => (
+                            <tr key={participant.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-sm text-gray-900">{participant.name || participant.email}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{participant.email}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{participant.phone || '-'}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-3 py-1 text-xs rounded-full font-semibold ${
+                                  participant.verification_status === 'verified'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : participant.verification_status === 'rejected'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {participant.verification_status === 'verified' ? '✅ Verified' : 
+                                   participant.verification_status === 'rejected' ? '❌ Rejected' : 
+                                   '⏳ Pending'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {participant.receipt_image_url ? (
+                                  <a href={participant.receipt_image_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 font-semibold text-sm">
+                                    📸 View
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400 text-sm">No receipt</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => setVerifyingRegistrationId(participant.id)}
+                                  disabled={participant.verification_status === 'verified'}
+                                  className="px-3 py-1 bg-emerald-500 text-white text-sm rounded-lg font-semibold hover:bg-emerald-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                >
+                                  {participant.verification_status === 'verified' ? '✓ Verified' : 'Verify'}
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Button to view participants if not already viewing */}
+                  {!viewingParticipants || viewingParticipants.id !== event.id ? (
+                    <button
+                      onClick={() => handleViewParticipants(event.id, event.title)}
+                      className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
+                    >
+                      👁️ View All Registrations
+                    </button>
+                  ) : null}
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>

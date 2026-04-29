@@ -19,6 +19,14 @@ export default function Navbar() {
     { to: '/dashboard', label: 'Dashboard', requiresAuth: true },
     { to: '/events', label: 'Events', requiresAuth: true },
     { to: '/profile', label: 'Profile', requiresAuth: true },
+    // Show "Coordinator Dashboard" if user is faculty with coordinator role
+    ...(user.role === 'faculty' && user.coordinator_type && user.coordinator_type !== 'none' ? [
+      { to: '/coordinator-dashboard', label: '🎯 Coordinator Hub', requiresAuth: true }
+    ] : []),
+    // Show "Club Portal" for club_president
+    ...(user.role === 'club_president' ? [
+      { to: '/club-dashboard', label: '🏆 Club Portal', requiresAuth: true }
+    ] : []),
     // Show "Manage Events" for club_head (admin)
     ...(user.role === 'club_head' || user.role === 'coordinator' ? [
       { to: '/admin', label: 'Manage Events', requiresAuth: true, adminOnly: true }

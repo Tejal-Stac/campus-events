@@ -24,8 +24,9 @@ export default function DeanDashboard() {
   const [deptFilter, setDeptFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState(null);
-  const [pendingEvents, setPendingEvents] = useState([]);
-  const [approvingId, setApprovingId] = useState(null);
+  const [faculties, setFaculties] = useState([]);
+  const [usedCategories, setUsedCategories] = useState({});
+  const [updatingFacultyId, setUpdatingFacultyId] = useState(null);
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -45,8 +46,8 @@ export default function DeanDashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "approvals") {
-      fetchPendingEvents();
+    if (activeTab === "faculty") {
+      fetchFaculties();
     }
   }, [activeTab]);
 
@@ -112,11 +113,38 @@ export default function DeanDashboard() {
     }
   };
 
+  const fetchFaculties = async () => {
+    try {
+      const res = await axios.get(`${API}/dean/faculties`, { headers });
+      setFaculties(res.data.data || []);
+      setUsedCategories(res.data.usedCategories || {});
+    } catch (err) {
+      showAlert(err.response?.data?.message || "Failed to load faculties", "error");
+    }
+  };
+
+  const updateFacultyCoordinator = async (facultyId, newType) => {
+    setUpdatingFacultyId(facultyId);
+    try {
+      const res = await axios.put(
+        `${API}/dean/faculties/${facultyId}/coordinator`,
+        { coordinatorType: newType },
+        { headers }
+      );
+      showAlert(res.data.message, "success");
+      fetchFaculties();
+    } catch (err) {
+      showAlert(err.response?.data?.message || "Failed to update coordinator", "error");
+    } finally {
+      setUpdatingFacultyId(null);
+    }
+  };
+
   const tabs = [
     { id: "overview", label: "📊 Overview" },
     { id: "departments", label: "🏛️ Departments" },
     { id: "events", label: "📅 Event Analytics" },
-    { id: "approvals", label: "✅ Approvals" },
+    { id: "faculty", label: "👨‍🏫 Faculty Management" },
     { id: "students", label: "👥 All Students" },
   ];
 
@@ -434,181 +462,95 @@ export default function DeanDashboard() {
               </div>
             )}
 
-            {/* APPROVALS TAB */}
-            {activeTab === "approvals" && (
+            {/* FACULTY MANAGEMENT TAB */}
+            {activeTab === "faculty" && (
               <div>
-                <div className="mb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <h2 className="text-xl font-bold text-gray-800">
-                    Event Approvals
+                    Faculty Coordination
                     <span className="ml-2 text-sm font-normal text-gray-400">
-                      ({pendingEvents.length} pending)
+                      ({faculties.length} faculty members)
                     </span>
                   </h2>
-                  <p className="text-sm text-gray-500 mt-1">Review and approve/reject pending event submissions</p>
                 </div>
 
-                {pendingEvents.length === 0 ? (
+                {faculties.length === 0 ? (
                   <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-                    <div className="text-4xl mb-3">✅</div>
-                    <p className="text-gray-500">No pending events</p>
-                    <p className="text-xs text-gray-400 mt-2">All events are approved!</p>
+                    <div className="text-4xl mb-3">👨‍🏫</div>
+                    <p className="text-gray-500">No faculty members found</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {pendingEvents.map(event => (
-                      <div key={event.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                        {/* Card Header */}
-                        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-gray-100 p-4">
-                          <h3 className="text-lg font-bold text-gray-800 line-clamp-2">
-                            {event.title}
-                          </h3>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Submitted on {new Date(event.created_at).toLocaleDateString()} at{' '}
-                            {new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            {["#", "Name", "Email", "Department", "Designation", "Coordinator Role"].map(h => (
+                              <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {faculties.map((fac, i) => (
+                            <tr key={fac.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-sm text-gray-400">{i + 1}</td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-800">
+                                {fac.name}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500">{fac.email}</td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">
+                                  {fac.department || "—"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{fac.designation || "—"}</td>
+                              <td className="px-4 py-3">
+                                <select
+                                  value={fac.coordinatorType}
+                                  onChange={(e) => updateFacultyCoordinator(fac.id, e.target.value)}
+                                  disabled={updatingFacultyId !== null}
+                                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                  <option value="none">No Role (none)</option>
+                                  <option value="Technical" disabled={usedCategories['Technical'] && usedCategories['Technical'] !== fac.id}>
+                                    Technical
+                                  </option>
+                                  <option value="Sports" disabled={usedCategories['Sports'] && usedCategories['Sports'] !== fac.id}>
+                                    Sports
+                                  </option>
+                                  <option value="Cultural" disabled={usedCategories['Cultural'] && usedCategories['Cultural'] !== fac.id}>
+                                    Cultural
+                                  </option>
+                                  <option value="Other" disabled={usedCategories['Other'] && usedCategories['Other'] !== fac.id}>
+                                    Other
+                                  </option>
+                                </select>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
-                        {/* Card Body */}
-                        <div className="p-4 space-y-3">
-                          {/* Faculty Information */}
-                          <div>
-                            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Faculty</p>
-                            <p className="text-sm font-medium text-gray-800 mt-0.5">
-                              {event.faculty_first_name} {event.faculty_last_name}
-                            </p>
-                            <p className="text-xs text-gray-500">{event.faculty_email}</p>
-                          </div>
-
-                          {/* Badges Row - Department & Category */}
-                          <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-                            {event.department && (
-                              <span className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full font-medium border border-amber-200">
-                                🏢 {event.department}
-                              </span>
-                            )}
-                            {event.category && (
-                              <span className="text-xs bg-purple-50 text-purple-700 px-2.5 py-1 rounded-full border border-purple-200">
-                                🏷️ {event.category}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Event Details Grid */}
-                          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
-                            <div>
-                              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Date</p>
-                              <p className="text-sm font-medium text-gray-800 mt-1">
-                                {new Date(event.date).toLocaleDateString('en-US', { 
-                                  weekday: 'short', 
-                                  month: 'short', 
-                                  day: 'numeric'
-                                })}
+                    {/* Legend */}
+                    <div className="border-t border-gray-100 p-4 bg-gray-50">
+                      <p className="text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wide">Coordinator Categories</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {["Technical", "Sports", "Cultural", "Other"].map(cat => {
+                          const assignedTo = usedCategories[cat];
+                          const assignedFaculty = faculties.find(f => f.id === assignedTo);
+                          return (
+                            <div key={cat} className="text-xs">
+                              <p className="font-semibold text-gray-700">{cat}</p>
+                              <p className="text-gray-500 mt-0.5">
+                                {assignedFaculty ? `📌 ${assignedFaculty.name}` : "Unassigned"}
                               </p>
                             </div>
-                            <div>
-                              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Type</p>
-                              <p className="text-sm font-medium text-gray-800 mt-1">{event.event_type}</p>
-                            </div>
-                          </div>
-
-                          {/* Financial & Logistics Info */}
-                          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
-                            <div>
-                              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Registration</p>
-                              <p className="text-sm font-medium text-gray-800 mt-1">
-                                {event.fees && event.fees !== '0' && event.fees !== 'Free' 
-                                  ? `₹${event.fees}` 
-                                  : 'Free'}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Venue</p>
-                              <p className="text-sm font-medium text-gray-800 mt-1 truncate">
-                                {event.venue?.substring(0, 20)}{event.venue?.length > 20 ? '...' : ''}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Description */}
-                          {event.description && (
-                            <div className="pt-2 border-t border-gray-100">
-                              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Description</p>
-                              <p className="text-sm text-gray-700 line-clamp-3">{event.description}</p>
-                            </div>
-                          )}
-
-                          {/* Special Guest */}
-                          {event.special_guest && (
-                            <div className="pt-2 border-t border-gray-100">
-                              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">👤 Guest Speaker</p>
-                              <p className="text-sm font-medium text-gray-800 mt-1">{event.special_guest}</p>
-                            </div>
-                          )}
-
-                          {/* Amenities */}
-                          {event.amenities && Array.isArray(event.amenities) && event.amenities.length > 0 && (
-                            <div className="pt-2 border-t border-gray-100">
-                              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-2">Amenities & Incentives</p>
-                              <div className="flex flex-wrap gap-2">
-                                {event.amenities.map((amenity, idx) => {
-                                  let icon = '📌';
-                                  if (amenity.includes('Food')) icon = '🍔';
-                                  else if (amenity.includes('Certificate') || amenity.includes('Gift')) icon = '🎁';
-                                  else if (amenity.includes('Duty') || amenity.includes('Leave')) icon = '📋';
-                                  
-                                  return (
-                                    <span key={idx} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full border border-emerald-200">
-                                      {icon} {amenity.replace(/\//g, ' & ')}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Card Footer - Action Buttons */}
-                        <div className="bg-gray-50 border-t border-gray-100 p-4 flex gap-3">
-                          {/* Approve Button */}
-                          <button
-                            onClick={() => handleApproveEvent(event.id)}
-                            disabled={approvingId !== null}
-                            className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-                          >
-                            {approvingId === event.id ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                                <span>Processing...</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>✓</span>
-                                <span>Approve</span>
-                              </>
-                            )}
-                          </button>
-
-                          {/* Reject Button */}
-                          <button
-                            onClick={() => handleRejectEvent(event.id)}
-                            disabled={approvingId !== null}
-                            className="flex-1 flex items-center justify-center gap-2 border-2 border-rose-500 hover:bg-rose-50 disabled:border-gray-300 disabled:text-gray-300 disabled:cursor-not-allowed text-rose-600 font-semibold py-2 px-4 rounded-lg transition-colors"
-                          >
-                            {approvingId === event.id ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-                                <span>Processing...</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>✕</span>
-                                <span>Reject</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
+                          );
+                        })}
                       </div>
-                    ))}
+                    </div>
                   </div>
                 )}
               </div>

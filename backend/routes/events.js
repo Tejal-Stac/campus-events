@@ -3,23 +3,29 @@ const router = express.Router()
 const PDFDocument = require('pdfkit')
 const pool = require('../config/db')
 const auth = require('../middleware/auth')
-const { isDean, isFacultyOrDean } = require('../middleware/auth')
+const { isDean, isFacultyOrDean, isFacultyOrDeanOrClubPresident } = require('../middleware/auth')
 const optionalAuth = require('../middleware/optionalAuth')
 const {
   getAllEvents, getPendingEvents, getEventById, createEvent,
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,
-  getPendingApprovals, approveNonVitian, rejectNonVitian
+  getPendingApprovals, approveNonVitian, rejectNonVitian,
+  getPendingEventsByCategory, approveEvent, rejectEvent, verifyStudentRegistration
 } = require('../controllers/eventController')
 
-router.get('/', getAllEvents)
+router.get('/', optionalAuth, getAllEvents)
 router.get('/pending', auth, isDean, getPendingEvents)
 router.get('/coordinator/stats', auth, getCoordinatorStats)
 router.get('/coordinator/volunteers', auth, getCoordinatorVolunteers)
 router.get('/coordinator/pending-approvals', auth, getPendingApprovals)
+router.get('/coordinator/pending-events', auth, getPendingEventsByCategory)
 router.put('/coordinator/approve/:userId', auth, approveNonVitian)
 router.delete('/coordinator/reject/:userId', auth, rejectNonVitian)
+router.put('/:eventId/approve', auth, approveEvent)
+router.put('/:eventId/reject', auth, rejectEvent)
+router.put('/registrations/:registrationId/verify', auth, verifyStudentRegistration)
+router.patch('/registrations/:registrationId/verify', auth, verifyStudentRegistration)
 
 router.get('/generate/:eventId', auth, async (req, res) => {
   try {
@@ -78,9 +84,9 @@ router.get('/generate/:eventId', auth, async (req, res) => {
 })
 
 router.get('/:id', getEventById)
-router.post('/', auth, isFacultyOrDean, createEvent)
+router.post('/', auth, isFacultyOrDeanOrClubPresident, createEvent)
 
-router.put('/:eventId', auth, isFacultyOrDean, async (req, res) => {
+router.put('/:eventId', auth, isFacultyOrDeanOrClubPresident, async (req, res) => {
   try {
     const { eventId } = req.params
     const { title, date, category, seats, venue, description, event_type, status } = req.body

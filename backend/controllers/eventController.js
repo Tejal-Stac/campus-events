@@ -3,16 +3,29 @@ const pool = require('../config/db')
 const getAllEvents = async (req, res) => {
   try {
     const { category, event_type, status } = req.query
-    const eventStatus = status || 'approved'
+    const isClubPresident = req.user?.role === 'club_president'
+    const eventStatus = isClubPresident ? (status || null) : (status || 'approved')
 
     let query = `
       SELECT e.*,
              COUNT(DISTINCT r.id)::int as registered_count
        FROM events e
        LEFT JOIN registrations r ON e.id = r.event_id
-       WHERE e.status = $1
+       WHERE 1=1
     `
-    const params = [eventStatus]
+    const params = []
+
+    if (isClubPresident) {
+      params.push(req.user.id)
+      query += ` AND e.faculty_id = $${params.length}`
+      if (eventStatus) {
+        params.push(eventStatus)
+        query += ` AND e.status = $${params.length}`
+      }
+    } else {
+      params.push(eventStatus)
+      query += ` AND e.status = $${params.length}`
+    }
 
     if (category && category !== 'All') {
       params.push(category)
@@ -213,6 +226,7 @@ const updateEventType = async (req, res) => {
 const registerForEvent = async (req, res) => {
   const eventId = req.params.id
   const userId = req.user ? req.user.id : null
+  const { receipt_image_url, verification_status } = req.body || {}
 
   try {
     const eventResult = await pool.query(
@@ -246,16 +260,27 @@ const registerForEvent = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Event is fully booked' })
     }
 
-    await pool.query(
-      `INSERT INTO registrations (event_id, user_id, status) VALUES ($1, $2, 'confirmed')`,
-      [eventId, userId]
+    const normalizedVerificationStatus = ['pending', 'verified', 'rejected'].includes(verification_status)
+      ? verification_status
+      : 'pending'
+
+    const registrationInsert = await pool.query(
+      `INSERT INTO registrations (event_id, user_id, status, receipt_image_url, verification_status)
+       VALUES ($1, $2, 'confirmed', $3, $4)
+       RETURNING id, event_id, user_id, verification_status, receipt_image_url`,
+      [eventId, userId, receipt_image_url || null, normalizedVerificationStatus]
     )
 
     console.log(`✅ User ${userId} registered for event ${eventId} (${event.title})`)
     res.json({
       success: true,
       message: 'Successfully registered for event!',
-      data: { eventId, eventTitle: event.title }
+      data: {
+        eventId,
+        eventTitle: event.title,
+        registration_id: registrationInsert.rows[0].id,
+        verification_status: registrationInsert.rows[0].verification_status
+      }
     })
   } catch (err) {
     console.error('REGISTER FOR EVENT ERROR:', err)
@@ -265,10 +290,21 @@ const registerForEvent = async (req, res) => {
 
 const getEventRegistrations = async (req, res) => {
   try {
+    if (req.user?.role === 'club_president') {
+      const ownershipCheck = await pool.query(
+        'SELECT id FROM events WHERE id = $1 AND faculty_id = $2',
+        [req.params.id, req.user.id]
+      )
+      if (ownershipCheck.rows.length === 0) {
+        return res.status(403).json({ success: false, message: 'You can only view registrations for your own events' })
+      }
+    }
+
     const result = await pool.query(
       `SELECT
+         r.id,
          r.id as registration_id,
-         r.registered_at, r.status,
+         r.registered_at, r.status, r.verification_status, r.receipt_image_url,
          u.first_name, u.last_name, u.email, u.gr_number,
          u.department, u.division, u.campus,
          u.college_type, u.college_name, u.phone,
@@ -405,10 +441,176 @@ const rejectNonVitian = async (req, res) => {
   }
 }
 
+// Phase 2: Coordinator Approval Workflow
+// GET /api/events/coordinator/pending - Get pending events for coordinator's category
+const getPendingEventsByCategory = async (req, res) => {
+  try {
+    const coordinatorType = req.user.coordinator_type
+    if (!coordinatorType || coordinatorType === 'none') {
+      return res.status(403).json({ success: false, message: 'Not assigned as a coordinator' })
+    }
+
+    // [FIX] Fetch events with status 'pending', 'approved', AND 'rejected' - not just 'pending'
+    // Also includes updated_at for resubmitted events
+    const result = await pool.query(
+      `SELECT e.id, e.title, e.description, e.date, e.venue, e.category,
+              e.event_type, e.status, e.coordinator_remarks, e.created_at, e.updated_at,
+              e.seats, e.fees, e.special_guest, e.amenities,
+              u.id as faculty_id, u.first_name as faculty_first_name, 
+              u.last_name as faculty_last_name, u.email as faculty_email,
+              COUNT(DISTINCT r.id)::int as registered_count
+       FROM events e
+       LEFT JOIN users u ON e.faculty_id = u.id
+       LEFT JOIN registrations r ON e.id = r.event_id
+       WHERE e.category = $1 AND e.status IN ('pending', 'approved', 'rejected')
+       GROUP BY e.id, u.id
+       ORDER BY e.created_at DESC`,
+      [coordinatorType]
+    )
+    
+    res.json({ success: true, data: result.rows })
+  } catch (err) {
+    console.error('GET PENDING EVENTS BY CATEGORY ERROR:', err.message)
+    res.status(500).json({ success: false, message: 'Server error', error: err.message })
+  }
+}
+
+// PUT /api/events/:id/approve - Approve an event
+const approveEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params
+    const coordinatorType = req.user.coordinator_type
+
+    // Verify the event exists and belongs to the coordinator's category
+    const eventCheck = await pool.query(
+      `SELECT id, category, status FROM events WHERE id = $1`,
+      [eventId]
+    )
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Event not found' })
+    }
+
+    const event = eventCheck.rows[0]
+    if (event.category !== coordinatorType) {
+      return res.status(403).json({ success: false, message: 'Not authorized to approve this event' })
+    }
+
+    if (event.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Event is not pending approval' })
+    }
+
+    // Approve the event
+    const result = await pool.query(
+      `UPDATE events SET status = 'approved', coordinator_id = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 RETURNING *`,
+      [req.user.id, eventId]
+    )
+
+    console.log(`✅ Event approved: ${result.rows[0].title} by coordinator ${req.user.id}`)
+    res.json({ success: true, message: 'Event approved!', data: result.rows[0] })
+  } catch (err) {
+    console.error('APPROVE EVENT ERROR:', err.message)
+    res.status(500).json({ success: false, message: 'Server error', error: err.message })
+  }
+}
+
+// PUT /api/events/:id/reject - Reject an event with remarks
+const rejectEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params
+    const { coordinator_remarks } = req.body
+    const coordinatorType = req.user.coordinator_type
+
+    if (!coordinator_remarks || coordinator_remarks.trim().length === 0) {
+      return res.status(400).json({ success: false, message: 'Remarks are required for rejection' })
+    }
+
+    // Verify the event exists and belongs to the coordinator's category
+    const eventCheck = await pool.query(
+      `SELECT id, category, status FROM events WHERE id = $1`,
+      [eventId]
+    )
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Event not found' })
+    }
+
+    const event = eventCheck.rows[0]
+    if (event.category !== coordinatorType) {
+      return res.status(403).json({ success: false, message: 'Not authorized to reject this event' })
+    }
+
+    if (event.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Event is not pending approval' })
+    }
+
+    // Reject the event
+    const result = await pool.query(
+      `UPDATE events SET status = 'rejected', coordinator_remarks = $1, coordinator_id = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3 RETURNING *`,
+      [coordinator_remarks, req.user.id, eventId]
+    )
+
+    console.log(`❌ Event rejected: ${result.rows[0].title} by coordinator ${req.user.id}`)
+    res.json({ success: true, message: 'Event rejected with remarks', data: result.rows[0] })
+  } catch (err) {
+    console.error('REJECT EVENT ERROR:', err.message)
+    res.status(500).json({ success: false, message: 'Server error', error: err.message })
+  }
+}
+
+// PUT /api/registrations/:id/verify - Verify a student's registration
+const verifyStudentRegistration = async (req, res) => {
+  try {
+    const { registrationId } = req.params
+    const { verification_status } = req.body
+
+    if (!['verified', 'rejected'].includes(verification_status)) {
+      return res.status(400).json({ success: false, message: 'Invalid verification status' })
+    }
+
+    const registrationOwnerCheck = await pool.query(
+      `SELECT r.id, e.id as event_id, e.faculty_id
+       FROM registrations r
+       INNER JOIN events e ON e.id = r.event_id
+       WHERE r.id = $1`,
+      [registrationId]
+    )
+
+    if (registrationOwnerCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Registration not found' })
+    }
+
+    const registration = registrationOwnerCheck.rows[0]
+    if (registration.faculty_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Only the event creator can verify registrations' })
+    }
+
+    const result = await pool.query(
+      `UPDATE registrations
+       SET verification_status = $1
+       WHERE id = $2
+       RETURNING *`,
+      [verification_status, registrationId]
+    )
+
+    res.json({ 
+      success: true, 
+      message: `Registration ${verification_status}!`, 
+      data: result.rows[0] 
+    })
+  } catch (err) {
+    console.error('VERIFY REGISTRATION ERROR:', err.message)
+    res.status(500).json({ success: false, message: 'Server error', error: err.message })
+  }
+}
+
 module.exports = {
   getAllEvents, getPendingEvents, getEventById, createEvent,
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,
-  getPendingApprovals, approveNonVitian, rejectNonVitian
+  getPendingApprovals, approveNonVitian, rejectNonVitian,
+  getPendingEventsByCategory, approveEvent, rejectEvent, verifyStudentRegistration
 }

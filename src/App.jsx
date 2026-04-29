@@ -16,6 +16,7 @@ import FacultyDashboard from './pages/FacultyDashboard'
 import VolunteerDashboard from './pages/VolunteerDashboard'
 import DeanDashboard from './pages/DeanDashboard'
 import HODDashboard from './pages/HODDashboard'
+import ClubDashboard from './pages/ClubDashboard'
 
 function SmartHomeRoute() {
   const { user, loading } = useAuth()
@@ -39,6 +40,7 @@ function SmartHomeRoute() {
       dean:        '/dean-dashboard',
       admin:       '/admin-dashboard',
       club_head:   '/coordinator-dashboard',
+      club_president: '/club-dashboard',
     }
     return <Navigate to={dashboardMap[user.role] || '/student-dashboard'} replace />
   }
@@ -110,7 +112,7 @@ function App() {
           <Route
             path="/coordinator-dashboard"
             element={
-              <ProtectedRoute allowedRoles={['coordinator', 'club_head']}>
+              <ProtectedRoute allowedRoles={['coordinator', 'club_head','faculty']}>
                 <CoordinatorDashboard />
               </ProtectedRoute>
             }
@@ -118,7 +120,7 @@ function App() {
           <Route
             path="/coordinator"
             element={
-              <ProtectedRoute allowedRoles={['club_head', 'coordinator']}>
+              <ProtectedRoute allowedRoles={['club_head', 'coordinator','faculty']}>
                 <CoordinatorDashboard />
               </ProtectedRoute>
             }
@@ -126,7 +128,7 @@ function App() {
           <Route
             path="/coord-dashboard"
             element={
-              <ProtectedRoute allowedRoles={['coordinator', 'club_head']}>
+              <ProtectedRoute allowedRoles={['coordinator', 'club_head','faculty']}>
                 <CoordinatorDashboard />
               </ProtectedRoute>
             }
@@ -182,6 +184,16 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['faculty', 'hod']}>
                 <FacultyDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Club President */}
+          <Route
+            path="/club-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['club_president']}>
+                <ClubDashboard />
               </ProtectedRoute>
             }
           />

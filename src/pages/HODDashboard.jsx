@@ -48,6 +48,7 @@ export default function HodDashboard() {
   const [eventStats, setEventStats] = useState(null)
   const [eventStudents, setEventStudents] = useState([])
   const [loadingModal, setLoadingModal] = useState(false)
+  const [faculties, setFaculties] = useState([])
 
   // Role guard
   useEffect(() => {
@@ -57,6 +58,12 @@ export default function HodDashboard() {
   }, [user, navigate])
 
   useEffect(() => { fetchAll() }, [])
+
+  useEffect(() => {
+    if (activeTab === 'faculty') {
+      fetchFaculties()
+    }
+  }, [activeTab])
 
   const getToken = () => localStorage.getItem('token')
   const headers = () => ({ Authorization: `Bearer ${getToken()}` })
@@ -75,6 +82,17 @@ export default function HodDashboard() {
       const res = await HodService.fetchHodStudents()
       setStudents(res.data || [])
     } catch (e) { console.error('Students fetch error:', e.message) }
+  }
+
+  const fetchFaculties = async () => {
+    try {
+      const API = 'http://localhost:5000/api'
+      const token = getToken()
+      const res = await axios.get(`${API}/users/departmental/faculty`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setFaculties(res.data.data || [])
+    } catch (e) { console.error('Faculties fetch error:', e.message) }
   }
 
   const fetchEvents = async (dept = 'All') => {
@@ -123,6 +141,7 @@ export default function HodDashboard() {
   const tabs = [
     { id: 'overview',  label: '📊 Overview' },
     { id: 'students',  label: '👥 My Students' },
+    { id: 'faculty',   label: '👨‍🏫 My Faculty' },
     { id: 'events',    label: '🎫 Events' },
     { id: 'analytics', label: '📈 Analytics' },
   ]
@@ -546,6 +565,85 @@ export default function HodDashboard() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════
+            TAB: FACULTY
+        ════════════════════════════════════════ */}
+        {activeTab === 'faculty' && (
+          <div style={card()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h2 style={{ color: '#1a3a6b', fontWeight: '700', fontSize: '16px' }}>👨‍🏫 {hodDept} Faculty</h2>
+                <p style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>Faculty members in your department</p>
+              </div>
+              <span style={{ background: '#eff6ff', color: '#1a3a6b', borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '600' }}>
+                {faculties.length} faculty
+              </span>
+            </div>
+
+            {faculties.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>👨‍🏫</div>
+                <p style={{ fontSize: '14px', fontWeight: '600' }}>No faculty found in {hodDept}</p>
+                <p style={{ fontSize: '12px', marginTop: '8px' }}>Faculty members will appear here</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8faff', borderBottom: '2px solid #dbeafe' }}>
+                      {['#', 'Name', 'Email', 'Designation', 'Coordinator Role', 'Joined'].map(h => (
+                        <th key={h} style={{ color: '#1a3a6b', fontSize: '12px', fontWeight: '700', padding: '10px 12px', textAlign: 'left' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {faculties.map((f, i) => (
+                      <tr key={f.id} style={{ borderBottom: '1px solid #dbeafe' }}>
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '13px' }}>{i + 1}</td>
+                        <td style={{ padding: '10px 12px', color: '#1a3a6b', fontSize: '13px', fontWeight: '600' }}>
+                          {f.name}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '13px' }}>{f.email}</td>
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '13px' }}>{f.designation || '—'}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          {f.coordinatorType && f.coordinatorType !== 'none' ? (
+                            <span style={badge('#7c3aed', '#fdf4ff')}>{f.coordinatorType}</span>
+                          ) : (
+                            <span style={badge('#64748b', '#f1f5f9')}>No Role</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '13px' }}>
+                          {new Date(f.createdAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Coordinator Legend */}
+            {faculties.length > 0 && (
+              <div style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '8px', padding: '12px 16px', marginTop: '16px' }}>
+                <p style={{ color: '#64748b', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>🎯 Coordinator Categories</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+                  {['Technical', 'Sports', 'Cultural', 'Other'].map(cat => {
+                    const coordinator = faculties.find(f => f.coordinatorType === cat);
+                    return (
+                      <div key={cat} style={{ fontSize: '12px' }}>
+                        <p style={{ color: '#1a3a6b', fontWeight: '600' }}>{cat}</p>
+                        <p style={{ color: '#64748b', fontSize: '11px', marginTop: '2px' }}>
+                          {coordinator ? `📌 ${coordinator.name}` : "Unassigned"}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
