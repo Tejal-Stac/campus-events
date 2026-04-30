@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
-import EventCard from '../components/EventCard'
 import axios from 'axios'
-import { X, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
@@ -22,67 +20,34 @@ export default function CoordinatorDashboard() {
   const [rejectRemark, setRejectRemark] = useState('')
   const [rejectingInProgress, setRejectingInProgress] = useState(false)
 
-  // [DIAGNOSTIC] Component rendered
-  console.log('COORD_DEBUG: CoordinatorDashboard Component Rendered - user:', user?.id, 'token:', token?.substring(0, 20) + '...')
-
-  // Verify coordinator access
   useEffect(() => {
-    console.log('COORD_DEBUG: Access check useEffect fired - user.coordinator_type:', user?.coordinator_type)
-    if (user && user.coordinator_type === 'none') {
-      console.log('COORD_DEBUG: Coordinator type is "none", redirecting to /dashboard')
+    if (user && user.role !== 'coordinator') {
       navigate('/dashboard', { replace: true })
     }
   }, [user, navigate])
 
-  // Fetch events for coordinator's category (pending, approved, AND rejected)
   useEffect(() => {
-    console.log('COORD_DEBUG: Fetch useEffect fired - user:', user?.id, 'token present:', !!token)
-    
     const fetchData = async () => {
       try {
-        console.log('COORD_DEBUG: fetchData started')
-        
-        // [FIX] Now fetches all three statuses (pending, approved, rejected) in one call
-        console.log('COORD_DEBUG: Fetching events for category:', user?.coordinator_type)
-        const url = `${API}/events/coordinator/pending-events`
-        console.log('COORD_DEBUG: Fetching from:', url)
-        const res = await axios.get(url, {
+        const res = await axios.get(`${API}/events/coordinator/pending-events`, {
           headers: { Authorization: `Bearer ${token}` }
         })
-        console.log('COORD_DEBUG: Events response:', res.data)
-        
         const allEvents = res.data.data || []
-        // Separate events by status
-        const pending = allEvents.filter(e => e.status === 'pending')
-        const approved = allEvents.filter(e => e.status === 'approved')
-        const rejected = allEvents.filter(e => e.status === 'rejected')
-        
-        console.log('COORD_DEBUG: Separated events - Pending:', pending.length, 'Approved:', approved.length, 'Rejected:', rejected.length)
-        
-        setPendingEvents(pending)
-        setApprovedEvents(approved)
-        setRejectedEvents(rejected)
-
-        showAlert(`Loaded ${pending.length} pending, ${approved.length} approved, ${rejected.length} rejected events`, 'success')
+        setPendingEvents(allEvents.filter(e => e.status === 'pending'))
+        setApprovedEvents(allEvents.filter(e => e.status === 'approved'))
+        setRejectedEvents(allEvents.filter(e => e.status === 'rejected'))
+        showAlert(`Loaded ${allEvents.length} events`, 'success')
       } catch (err) {
-        console.error('COORD_DEBUG: Fetch data error:', err.response?.status, err.response?.data, err.message)
+        console.error('Coordinator fetch error:', err.response?.status, err.response?.data?.message)
         showAlert(err.response?.data?.message || 'Failed to fetch events', 'error')
-        setPendingEvents([])
-        setApprovedEvents([])
-        setRejectedEvents([])
       } finally {
-        console.log('COORD_DEBUG: Fetch complete, setting loading to false')
         setLoading(false)
       }
     }
 
-    // [FIX] Proper null guard check
-    if (user && token && user.coordinator_type && user.coordinator_type !== 'none') {
-      console.log('COORD_DEBUG: Conditions met - fetching data')
+    if (user && token && user.role === 'coordinator') {
       fetchData()
     } else {
-      console.log('COORD_DEBUG: Conditions NOT met - user:', !!user, 'token:', !!token, 'coordinator_type:', user?.coordinator_type)
-      // Still stop loading if conditions aren't met after initial render
       setLoading(false)
     }
   }, [user, token])
@@ -99,19 +64,13 @@ export default function CoordinatorDashboard() {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       )
-      showAlert('✅ Event approved successfully!', 'success')
-      setPendingEvents(pendingEvents.filter(e => e.id !== eventId))
-      if (res.data.data) {
-        setApprovedEvents([res.data.data, ...approvedEvents])
-      }
+      showAlert('Event approved successfully!', 'success')
+      const approvedEvent = res.data.data
+      setPendingEvents(prev => prev.filter(e => e.id !== eventId))
+      if (approvedEvent) setApprovedEvents(prev => [approvedEvent, ...prev])
     } catch (err) {
       showAlert(err.response?.data?.message || 'Failed to approve event', 'error')
     }
-  }
-
-  const handleRejectEventClick = (eventId) => {
-    setRejectingEventId(eventId)
-    setRejectRemark('')
   }
 
   const handleRejectEventSubmit = async (eventId) => {
@@ -119,7 +78,6 @@ export default function CoordinatorDashboard() {
       showAlert('Please provide remarks for rejection', 'error')
       return
     }
-
     try {
       setRejectingInProgress(true)
       const res = await axios.put(
@@ -127,9 +85,10 @@ export default function CoordinatorDashboard() {
         { coordinator_remarks: rejectRemark },
         { headers: { Authorization: `Bearer ${token}` } }
       )
-      showAlert('❌ Event rejected with remarks sent to faculty', 'success')
-      setPendingEvents(pendingEvents.filter(e => e.id !== eventId))
-      setRejectedEvents([res.data.data, ...rejectedEvents])
+      showAlert('Event rejected with remarks', 'success')
+      const rejectedEvent = res.data.data
+      setPendingEvents(prev => prev.filter(e => e.id !== eventId))
+      if (rejectedEvent) setRejectedEvents(prev => [rejectedEvent, ...prev])
       setRejectingEventId(null)
       setRejectRemark('')
     } catch (err) {
@@ -153,42 +112,44 @@ export default function CoordinatorDashboard() {
     )
   }
 
+  const coordinatorLabel = user?.coordinator_type && user.coordinator_type !== 'none'
+    ? `— ${user.coordinator_type} Category`
+    : '— All Categories'
+
+  const tabs = [
+    { id: 'pending',  label: `⏳ Pending (${pendingEvents.length})`,   activeColor: 'border-amber-500 text-amber-700' },
+    { id: 'approved', label: `✅ Approved (${approvedEvents.length})`,  activeColor: 'border-emerald-500 text-emerald-700' },
+    { id: 'rejected', label: `❌ Rejected (${rejectedEvents.length})`,  activeColor: 'border-rose-500 text-rose-700' },
+  ]
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      {/* Alert */}
       {alert && (
-        <div className={`m-4 p-4 rounded-lg ${alert.type === 'success' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-rose-100 text-rose-800 border border-rose-300'}`}>
+        <div className={`m-4 p-4 rounded-lg ${
+          alert.type === 'success'
+            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+            : 'bg-rose-100 text-rose-800 border border-rose-300'
+        }`}>
           {alert.message}
         </div>
       )}
 
       <div className="max-w-6xl mx-auto p-6">
-        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            🎯 Coordinator Hub - {user?.coordinator_type || 'Loading...'}
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Review and approve/reject events in the {user?.coordinator_type} category
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">🎯 Coordinator Hub {coordinatorLabel}</h1>
+          <p className="text-gray-600 mt-2">Review and approve or reject events</p>
         </div>
 
         {/* Tabs */}
         <div className="flex space-x-2 mb-6 border-b border-gray-200">
-          {[
-            { id: 'pending', label: `⏳ Pending (${pendingEvents.length})`, color: 'amber' },
-            { id: 'approved', label: `✅ Approved (${approvedEvents.length})`, color: 'emerald' },
-            { id: 'rejected', label: `❌ Rejected (${rejectedEvents.length})`, color: 'rose' }
-          ].map(tab => (
+          {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-3 font-medium border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? `border-${tab.color}-500 text-${tab.color}-700`
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                activeTab === tab.id ? tab.activeColor : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
               {tab.label}
@@ -196,13 +157,12 @@ export default function CoordinatorDashboard() {
           ))}
         </div>
 
-        {/* Pending Events */}
+        {/* Pending */}
         {activeTab === 'pending' && (
           <div className="space-y-4">
             {pendingEvents.length === 0 ? (
-              <div className="bg-white rounded-lg p-8 text-center">
-                <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600">No pending events to review</p>
+              <div className="bg-white rounded-lg p-8 text-center text-gray-500">
+                ⚠️ No pending events to review
               </div>
             ) : (
               pendingEvents.map(event => (
@@ -210,11 +170,17 @@ export default function CoordinatorDashboard() {
                   <div className="flex gap-4 p-4">
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-gray-900">{event.title}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{event.description?.substring(0, 150)}...</p>
-                      <div className="flex gap-4 mt-3 text-sm text-gray-600">
+                      <p className="text-sm text-gray-600 mt-1">
+                        {(event.description || '').substring(0, 150)}{(event.description || '').length > 150 ? '...' : ''}
+                      </p>
+                      <div className="flex flex-wrap gap-3 mt-3 text-sm text-gray-600">
                         <span>📅 {new Date(event.date).toLocaleDateString('en-IN')}</span>
                         <span>📍 {event.venue}</span>
+                        <span>🏷️ {event.category}</span>
                         <span>👥 {event.registered_count || 0} registered</span>
+                        {event.faculty_first_name && (
+                          <span>👤 {event.faculty_first_name} {event.faculty_last_name}</span>
+                        )}
                       </div>
                       <div className="mt-2">
                         <span className="inline-block bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-semibold">
@@ -223,25 +189,22 @@ export default function CoordinatorDashboard() {
                       </div>
                     </div>
 
-                    <div className="flex gap-2 self-start">
+                    <div className="flex flex-col gap-2 self-start">
                       <button
                         onClick={() => handleApproveEvent(event.id)}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                       >
-                        <CheckCircle className="w-4 h-4" />
-                        Approve
+                        ✓ Approve
                       </button>
                       <button
-                        onClick={() => handleRejectEventClick(event.id)}
-                        className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                        onClick={() => { setRejectingEventId(event.id); setRejectRemark('') }}
+                        className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                       >
-                        <XCircle className="w-4 h-4" />
-                        Reject
+                        ✕ Reject
                       </button>
                     </div>
                   </div>
 
-                  {/* Reject Modal */}
                   {rejectingEventId === event.id && (
                     <div className="bg-rose-50 border-t border-rose-200 p-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -258,13 +221,13 @@ export default function CoordinatorDashboard() {
                         <button
                           onClick={() => handleRejectEventSubmit(event.id)}
                           disabled={rejectingInProgress}
-                          className="bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                          className="bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white px-4 py-2 rounded-lg font-medium"
                         >
                           {rejectingInProgress ? 'Rejecting...' : 'Confirm Rejection'}
                         </button>
                         <button
                           onClick={() => setRejectingEventId(null)}
-                          className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
+                          className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg font-medium"
                         >
                           Cancel
                         </button>
@@ -277,28 +240,25 @@ export default function CoordinatorDashboard() {
           </div>
         )}
 
-        {/* Approved Events */}
+        {/* Approved */}
         {activeTab === 'approved' && (
           <div className="space-y-4">
             {approvedEvents.length === 0 ? (
-              <div className="bg-white rounded-lg p-8 text-center">
-                <CheckCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600">No approved events yet</p>
-              </div>
+              <div className="bg-white rounded-lg p-8 text-center text-gray-500">✅ No approved events yet</div>
             ) : (
               approvedEvents.map(event => (
                 <div key={event.id} className="bg-white rounded-lg shadow p-4 border-l-4 border-emerald-500">
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="text-lg font-bold text-gray-900">{event.title}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{event.description?.substring(0, 100)}...</p>
-                      <div className="flex gap-4 mt-2 text-sm text-gray-600">
+                      <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-600">
                         <span>📅 {new Date(event.date).toLocaleDateString('en-IN')}</span>
                         <span>📍 {event.venue}</span>
+                        <span>🏷️ {event.category}</span>
                         <span>👥 {event.registered_count || 0} registered</span>
                       </div>
                     </div>
-                    <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-semibold">
+                    <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
                       ✅ Approved
                     </span>
                   </div>
@@ -308,31 +268,29 @@ export default function CoordinatorDashboard() {
           </div>
         )}
 
-        {/* Rejected Events */}
+        {/* Rejected */}
         {activeTab === 'rejected' && (
           <div className="space-y-4">
             {rejectedEvents.length === 0 ? (
-              <div className="bg-white rounded-lg p-8 text-center">
-                <XCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600">No rejected events</p>
-              </div>
+              <div className="bg-white rounded-lg p-8 text-center text-gray-500">❌ No rejected events</div>
             ) : (
               rejectedEvents.map(event => (
                 <div key={event.id} className="bg-white rounded-lg shadow p-4 border-l-4 border-rose-500">
                   <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex-1">
                       <h3 className="text-lg font-bold text-gray-900">{event.title}</h3>
                       {event.coordinator_remarks && (
                         <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-sm text-rose-800">
                           <strong>Rejection reason:</strong> {event.coordinator_remarks}
                         </div>
                       )}
-                      <div className="flex gap-4 mt-2 text-sm text-gray-600">
+                      <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-600">
                         <span>📅 {new Date(event.date).toLocaleDateString('en-IN')}</span>
                         <span>📍 {event.venue}</span>
+                        <span>🏷️ {event.category}</span>
                       </div>
                     </div>
-                    <span className="bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-sm font-semibold">
+                    <span className="bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap ml-4">
                       ❌ Rejected
                     </span>
                   </div>

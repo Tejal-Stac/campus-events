@@ -14,19 +14,34 @@ const {
   getPendingEventsByCategory, approveEvent, rejectEvent, verifyStudentRegistration
 } = require('../controllers/eventController')
 
+// ─── General event routes ───────────────────────────────────────────────────
 router.get('/', optionalAuth, getAllEvents)
-router.get('/pending', auth, isDean, getPendingEvents)
+router.post('/', auth, isFacultyOrDeanOrClubPresident, createEvent)
+
+// ─── Coordinator routes ─────────────────────────────────────────────────────
 router.get('/coordinator/stats', auth, getCoordinatorStats)
 router.get('/coordinator/volunteers', auth, getCoordinatorVolunteers)
 router.get('/coordinator/pending-approvals', auth, getPendingApprovals)
 router.get('/coordinator/pending-events', auth, getPendingEventsByCategory)
 router.put('/coordinator/approve/:userId', auth, approveNonVitian)
 router.delete('/coordinator/reject/:userId', auth, rejectNonVitian)
-router.put('/:eventId/approve', auth, approveEvent)
-router.put('/:eventId/reject', auth, rejectEvent)
+
+// ─── Dean: pending events list ───────────────────────────────────────────────
+router.get('/pending', auth, isDean, getPendingEvents)
+
+// ─── ✅ FIX: Verify registration route ──────────────────────────────────────
+// Frontend calls: PATCH /api/registrations/:id/verify
+// This is mounted at /api/events, so the correct path here is:
+//   PUT  /registrations/:registrationId/verify
+//   PATCH /registrations/:registrationId/verify  ← frontend uses this
 router.put('/registrations/:registrationId/verify', auth, verifyStudentRegistration)
 router.patch('/registrations/:registrationId/verify', auth, verifyStudentRegistration)
 
+// ─── Approve / Reject event (coordinator workflow) ──────────────────────────
+router.put('/:eventId/approve', auth, approveEvent)
+router.put('/:eventId/reject', auth, rejectEvent)
+
+// ─── Certificate generation ─────────────────────────────────────────────────
 router.get('/generate/:eventId', auth, async (req, res) => {
   try {
     const studentId = req.user.id
@@ -83,15 +98,19 @@ router.get('/generate/:eventId', auth, async (req, res) => {
   }
 })
 
+// ─── Single event CRUD ───────────────────────────────────────────────────────
 router.get('/:id', getEventById)
-router.post('/', auth, isFacultyOrDeanOrClubPresident, createEvent)
 
 router.put('/:eventId', auth, isFacultyOrDeanOrClubPresident, async (req, res) => {
   try {
     const { eventId } = req.params
     const { title, date, category, seats, venue, description, event_type, status } = req.body
     const result = await pool.query(
-      `UPDATE events SET title=COALESCE($1,title), date=COALESCE($2,date), category=COALESCE($3,category), seats=COALESCE($4,seats), venue=COALESCE($5,venue), description=COALESCE($6,description), event_type=COALESCE($7,event_type), status=COALESCE($8,status) WHERE id=$9 RETURNING *`,
+      `UPDATE events SET
+         title=COALESCE($1,title), date=COALESCE($2,date), category=COALESCE($3,category),
+         seats=COALESCE($4,seats), venue=COALESCE($5,venue), description=COALESCE($6,description),
+         event_type=COALESCE($7,event_type), status=COALESCE($8,status)
+       WHERE id=$9 RETURNING *`,
       [title, date, category, seats, venue, description, event_type, status, eventId]
     )
     if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Event not found' })
@@ -104,9 +123,12 @@ router.put('/:eventId', auth, isFacultyOrDeanOrClubPresident, async (req, res) =
 
 router.put('/:id/status', auth, isDean, updateEventStatus)
 router.patch('/:id/event-type', auth, updateEventType)
+
+// ─── Registration routes ─────────────────────────────────────────────────────
 router.post('/:id/register', optionalAuth, registerForEvent)
 router.get('/:id/registrations', auth, getEventRegistrations)
 
+// ─── Participants & Report ───────────────────────────────────────────────────
 router.get('/:eventId/participants', auth, async (req, res) => {
   try {
     const { eventId } = req.params
