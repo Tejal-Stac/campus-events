@@ -18,6 +18,7 @@ import DeanDashboard from './pages/DeanDashboard'
 import HODDashboard from './pages/HODDashboard'
 import ClubDashboard from './pages/ClubDashboard'
 
+
 function SmartHomeRoute() {
   const { user, loading } = useAuth()
 
@@ -29,6 +30,7 @@ function SmartHomeRoute() {
       </div>
     )
   }
+
 
   if (user) {
     const dashboardMap = {
