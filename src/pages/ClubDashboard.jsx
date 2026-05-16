@@ -2,19 +2,26 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
+import EventCard from '../components/EventCard'
 import eventService from '../api/eventService'
 import api from '../api/axiosConfig'
+import { groupEventsByStatus } from '../utils/eventHelpers'
 
-const initialEventDraft = {
+const initialFormData = {
   title: '',
   category: '',
-  date: '',
-  time: '',
+  start_date: '',
+  end_date: '',
   venue: '',
-  fees: 0,
-  seats: 1,
+  registration_fee: 0,
+  max_participants: 1,
   description: '',
+  external_allowed: false,
   coordinator_remarks: '',
+  club_name: '',
+  special_guest: '',
+  amenities: '',
+  audience_type: 'All',
 }
 
 function StatusBadge({ status }) {
@@ -69,20 +76,22 @@ export default function ClubDashboard() {
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState('events')
+  const [statusTab, setStatusTab] = useState('upcoming')
   const [events, setEvents] = useState([])
   const [registrations, setRegistrations] = useState([])
   const [loading, setLoading] = useState(true)
   const [savingEventId, setSavingEventId] = useState(null)
   const [verifyLoadingId, setVerifyLoadingId] = useState(null)
   const [toasts, setToasts] = useState([])
+  const [posterFile, setPosterFile] = useState(null)
 
   const [showCreate, setShowCreate] = useState(false)
-  const [eventDraft, setEventDraft] = useState(initialEventDraft)
+  const [formData, setFormData] = useState(initialFormData)
   // Validation errors
   const [formErrors, setFormErrors] = useState({})
 
   const [editingEvent, setEditingEvent] = useState(null)
-  const [editDraft, setEditDraft] = useState(initialEventDraft)
+  const [editDraft, setEditDraft] = useState(initialFormData)
 
   useEffect(() => {
     if (user && user.role !== 'club_president') {
@@ -100,44 +109,47 @@ export default function ClubDashboard() {
 
   const dismissToast = (id) => setToasts((prev) => prev.filter((t) => t.id !== id))
 
-  const fetchEvents = async () => {
+  const loadDashboardData = async () => {
     try {
-      const eventsData = await eventService.getAllEvents({ creator_id: user.id });
-      setEvents(eventsData || []);
+      setLoading(true)
+      const eventsData = await eventService.getAllEvents({ creator_id: user.id })
+      setEvents(eventsData || [])
+      // ✅ Fix: fetch registrations by creator_id (president is a student-role user)
+      const regData = await api.get(`/events/registrations/managed/${user.id}`)
+      console.log('📊 Verification tab registrations:', regData.data)
+      setRegistrations(regData.data?.data || [])
     } catch (err) {
-      console.error('Events fetch failed:', err);
+      console.error('Dashboard load failed:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
     if (user?.role === 'club_president') {
-      fetchEvents();
+      loadDashboardData()
     }
-  }, [user?.role, user?.id]);
+  }, [user?.role, user?.id])
 
   const pendingVerificationCount = useMemo(
     () => registrations.filter((r) => (r.verification_status || 'pending') === 'pending').length,
     [registrations]
   )
 
-  // Strict validation for event creation
   const validateEventDraft = (draft) => {
     const errors = {}
     if (!draft.title || draft.title.trim().length < 5) errors.title = 'Event name must be at least 5 characters.'
-    if (!draft.category || !['Technical','Cultural','Sports'].includes(draft.category)) errors.category = 'Select a valid category.'
-    if (!draft.date) errors.date = 'Date is required.'
-    else if (new Date(draft.date) < new Date(new Date().toDateString())) errors.date = 'Date must be in the future.'
+    if (!draft.category || !['Technical','Cultural','Sports','Workshop'].includes(draft.category)) errors.category = 'Select a valid category.'
+    if (!draft.start_date) errors.start_date = 'Start date & time is required.'
     if (!draft.venue || draft.venue.trim().length === 0) errors.venue = 'Venue is required.'
-    if (draft.fees === '' || isNaN(Number(draft.fees)) || Number(draft.fees) < 0) errors.fees = 'Registration fee must be 0 or more.'
-    if (!draft.seats || isNaN(Number(draft.seats)) || Number(draft.seats) < 1) errors.seats = 'Participant limit must be at least 1.'
+    if (draft.registration_fee === '' || isNaN(Number(draft.registration_fee)) || Number(draft.registration_fee) < 0) errors.registration_fee = 'Registration fee must be 0 or more.'
+    if (!draft.max_participants || isNaN(Number(draft.max_participants)) || Number(draft.max_participants) < 1) errors.max_participants = 'Participant limit must be at least 1.'
     if (!draft.description || draft.description.trim().length < 20) errors.description = 'Description must be at least 20 characters.'
     return errors
   }
 
   const onCreateEvent = async () => {
-    const errors = validateEventDraft(eventDraft)
+    const errors = validateEventDraft(formData)
     setFormErrors(errors)
     if (Object.keys(errors).length > 0) {
       pushToast('Please fix the form errors.', 'error')
@@ -145,15 +157,14 @@ export default function ClubDashboard() {
     }
     try {
       setSavingEventId('create')
-      await eventService.createEvent({
-        ...eventDraft,
-        creator_id: user.id,
-        status: 'pending',
-        coordinator_remarks: eventDraft.coordinator_remarks || 'Pending Review',
-      })
+      const fd = new FormData()
+      Object.entries({ ...formData, creator_id: user.id, status: 'pending' }).forEach(([k, v]) => fd.append(k, v))
+      if (posterFile) fd.append('poster', posterFile)
+      await api.post('/events', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       pushToast('Event submitted. Status is pending for approval.', 'success')
       setShowCreate(false)
-      setEventDraft(initialEventDraft)
+      setFormData(initialFormData)
+      setPosterFile(null)
       setFormErrors({})
       await loadDashboardData()
     } catch (error) {
@@ -163,21 +174,40 @@ export default function ClubDashboard() {
     }
   }
 
+  const grouped = useMemo(() => groupEventsByStatus(events), [events])
+  const STATUS_TABS = [
+    { key: 'live',     label: '🔴 Live',     color: 'bg-red-600' },
+    { key: 'upcoming', label: '📅 Upcoming', color: 'bg-violet-600' },
+    { key: 'past',     label: '🏁 Past',     color: 'bg-gray-500' },
+  ]
+
   const openEditResubmit = (event) => {
     setEditingEvent(event)
     setEditDraft({
       title: event.title || '',
-      date: event.date ? new Date(event.date).toISOString().slice(0, 10) : '',
+      start_date: event.start_date ? new Date(event.start_date).toISOString().slice(0, 16) : '',
+      end_date: event.end_date ? new Date(event.end_date).toISOString().slice(0, 16) : '',
       venue: event.venue || '',
       category: event.category || '',
       description: event.description || '',
-      event_type: event.event_type || 'Intracollege',
-      seats: event.seats || 100,
-      fees: event.fees || 'Free',
+      max_participants: event.max_participants || 1,
+      registration_fee: event.registration_fee || 0,
+      external_allowed: !!event.external_allowed,
+      coordinator_remarks: event.coordinator_remarks || '',
+      club_name: event.club_name || '',
+      special_guest: event.special_guest || '',
+      amenities: event.amenities || '',
+      audience_type: event.audience_type || 'All',
     })
   }
 
   const saveResubmission = async () => {
+    const errors = validateEventDraft(editDraft)
+    setFormErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      pushToast('Please fix the form errors.', 'error')
+      return
+    }
     if (!editingEvent) return
 
     try {
@@ -258,7 +288,6 @@ export default function ClubDashboard() {
               Verification Hub ({pendingVerificationCount})
             </button>
           </div>
-          {/* Only show Create Event for club_president */}
           {activeTab === 'events' && user?.role === 'club_president' && (
             <button
               onClick={() => setShowCreate(true)}
@@ -272,60 +301,52 @@ export default function ClubDashboard() {
         {loading ? (
           <div className="bg-white rounded-2xl p-10 text-center text-gray-500">Loading dashboard...</div>
         ) : activeTab === 'events' ? (
-          <div className="bg-white rounded-2xl border border-violet-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-violet-50 border-b border-violet-100">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-violet-900">Event</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-violet-900">Date</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-violet-900">Venue</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-violet-900">Status</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-violet-900">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {events.length === 0 && (
-                    <tr>
-                      <td colSpan="5" className="px-4 py-10 text-center text-gray-500">
-                        No events created yet.
-                      </td>
-                    </tr>
-                  )}
-                  {events.map((event) => (
-                    <tr key={event.id} className="border-b border-violet-50 align-top">
-                      <td className="px-4 py-4">
-                        <div className="font-semibold text-gray-900">{event.title}</div>
-                        <div className="text-xs text-gray-500 mt-1">{event.category || 'General'} • {event.event_type || 'Intracollege'}</div>
-                        {event.status === 'rejected' && event.coordinator_remarks && (
-                          <div className="mt-3 p-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 text-xs">
-                            <div className="font-semibold mb-1">Coordinator Remarks</div>
-                            <div>{event.coordinator_remarks}</div>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-700">
-                        {event.date ? new Date(event.date).toLocaleDateString('en-IN') : '-'}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-700">{event.venue || '-'}</td>
-                      <td className="px-4 py-4"><StatusBadge status={event.status} /></td>
-                      <td className="px-4 py-4">
-                        {event.status === 'rejected' ? (
-                          <button
-                            onClick={() => openEditResubmit(event)}
-                            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold"
-                          >
-                            Edit & Resubmit
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-500">No action</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div>
+            {/* Status sub-tabs */}
+            <div className="flex gap-2 mb-5">
+              {STATUS_TABS.map(t => (
+                <button key={t.key}
+                  onClick={() => setStatusTab(t.key)}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                    statusTab === t.key ? `${t.color} text-white shadow` : 'bg-white border border-violet-200 text-violet-700 hover:bg-violet-50'
+                  }`}
+                >
+                  {t.label}
+                  <span className="ml-2 bg-white/30 text-xs px-1.5 py-0.5 rounded-full">
+                    {grouped[t.key]?.length || 0}
+                  </span>
+                </button>
+              ))}
             </div>
+
+            {grouped[statusTab]?.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-violet-100 p-12 text-center text-gray-400">
+                No {statusTab} events.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {grouped[statusTab].map(event => (
+                  <div key={event.id} className="relative">
+                    <EventCard
+                      event={event}
+                      role="club_president"
+                      onAction={() => {}}
+                      isOwner={true}
+                    />
+                    {event.status === 'rejected' && (
+                      <div className="mt-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800">
+                        <p className="font-bold mb-1">Coordinator Remarks</p>
+                        <p>{event.coordinator_remarks}</p>
+                        <button onClick={() => openEditResubmit(event)}
+                          className="mt-2 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold">
+                          Edit & Resubmit
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-violet-100 shadow-sm overflow-hidden">
@@ -349,7 +370,7 @@ export default function ClubDashboard() {
                     </tr>
                   )}
                   {registrations.map((r) => {
-                    const studentName = r.reg_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Participant'
+                    const studentName = r.student_name || r.name || r.reg_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Participant'
                     const status = r.verification_status || 'pending'
                     const isPending = status === 'pending'
                     return (
@@ -392,17 +413,18 @@ export default function ClubDashboard() {
 
       {(showCreate || editingEvent) && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-violet-100">
-            <div className="px-6 py-4 border-b border-violet-100">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-violet-100 flex flex-col" style={{ maxHeight: '85vh' }}>
+            <div className="px-6 py-4 border-b border-violet-100 flex-shrink-0">
               <h2 className="text-lg font-bold text-violet-900">{showCreate ? 'Create Event' : 'Edit & Resubmit Event'}</h2>
             </div>
-            <div className="p-6 space-y-3">
+            <div className="p-6 space-y-3 overflow-y-auto flex-1">
               <label className="block text-sm font-semibold text-gray-700 mb-1">Event Name *</label>
               <input
-                value={showCreate ? eventDraft.title : editDraft.title}
+                required
+                value={showCreate ? formData.title : editDraft.title}
                 onChange={(e) =>
                   showCreate
-                    ? setEventDraft((p) => ({ ...p, title: e.target.value }))
+                    ? setFormData((p) => ({ ...p, title: e.target.value }))
                     : setEditDraft((p) => ({ ...p, title: e.target.value }))
                 }
                 placeholder="Event name (min 5 chars)"
@@ -414,10 +436,11 @@ export default function ClubDashboard() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Category *</label>
                   <select
-                    value={showCreate ? eventDraft.category : editDraft.category}
+                    required
+                    value={showCreate ? formData.category : editDraft.category}
                     onChange={(e) =>
                       showCreate
-                        ? setEventDraft((p) => ({ ...p, category: e.target.value }))
+                        ? setFormData((p) => ({ ...p, category: e.target.value }))
                         : setEditDraft((p) => ({ ...p, category: e.target.value }))
                     }
                     className={`w-full px-3 py-2 rounded-lg border ${formErrors.category ? 'border-rose-400' : 'border-violet-200'} focus:ring-2 focus:ring-violet-300 focus:outline-none`}
@@ -426,33 +449,18 @@ export default function ClubDashboard() {
                     <option value="Technical">Technical</option>
                     <option value="Cultural">Cultural</option>
                     <option value="Sports">Sports</option>
+                    <option value="Workshop">Workshop</option>
                   </select>
                   {formErrors.category && <div className="text-xs text-rose-600 mb-1">{formErrors.category}</div>}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Date *</label>
-                  <input
-                    type="date"
-                    value={showCreate ? eventDraft.date : editDraft.date}
-                    onChange={(e) =>
-                      showCreate
-                        ? setEventDraft((p) => ({ ...p, date: e.target.value }))
-                        : setEditDraft((p) => ({ ...p, date: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.date ? 'border-rose-400' : 'border-violet-200'} focus:ring-2 focus:ring-violet-300 focus:outline-none`}
-                  />
-                  {formErrors.date && <div className="text-xs text-rose-600 mb-1">{formErrors.date}</div>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Venue *</label>
                   <input
-                    value={showCreate ? eventDraft.venue : editDraft.venue}
+                    required
+                    value={showCreate ? formData.venue : editDraft.venue}
                     onChange={(e) =>
                       showCreate
-                        ? setEventDraft((p) => ({ ...p, venue: e.target.value }))
+                        ? setFormData((p) => ({ ...p, venue: e.target.value }))
                         : setEditDraft((p) => ({ ...p, venue: e.target.value }))
                     }
                     placeholder="Venue"
@@ -460,49 +468,110 @@ export default function ClubDashboard() {
                   />
                   {formErrors.venue && <div className="text-xs text-rose-600 mb-1">{formErrors.venue}</div>}
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Start Date & Time *</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={showCreate ? formData.start_date : editDraft.start_date}
+                    onChange={(e) =>
+                      showCreate
+                        ? setFormData((p) => ({ ...p, start_date: e.target.value }))
+                        : setEditDraft((p) => ({ ...p, start_date: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.start_date ? 'border-rose-400' : 'border-violet-200'} focus:ring-2 focus:ring-violet-300 focus:outline-none`}
+                  />
+                  {formErrors.start_date && <div className="text-xs text-rose-600 mb-1">{formErrors.start_date}</div>}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">End Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    value={showCreate ? formData.end_date : editDraft.end_date}
+                    onChange={(e) =>
+                      showCreate
+                        ? setFormData((p) => ({ ...p, end_date: e.target.value }))
+                        : setEditDraft((p) => ({ ...p, end_date: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 rounded-lg border border-violet-200 focus:ring-2 focus:ring-violet-300 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Event Poster / PPT</label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf,.ppt,.pptx"
+                  onChange={(e) => setPosterFile(e.target.files[0] || null)}
+                  className="w-full px-3 py-2 rounded-lg border border-violet-200 text-sm text-gray-600 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-violet-100 file:text-violet-700 file:font-semibold hover:file:bg-violet-200"
+                />
+                {posterFile && <p className="text-xs text-violet-600 mt-1">📎 {posterFile.name}</p>}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Registration Fee (₹) *</label>
                   <input
                     type="number"
                     min="0"
-                    value={showCreate ? eventDraft.fees : editDraft.fees}
+                    required
+                    value={showCreate ? formData.registration_fee : editDraft.registration_fee}
                     onChange={(e) =>
                       showCreate
-                        ? setEventDraft((p) => ({ ...p, fees: e.target.value }))
-                        : setEditDraft((p) => ({ ...p, fees: e.target.value }))
+                        ? setFormData((p) => ({ ...p, registration_fee: e.target.value }))
+                        : setEditDraft((p) => ({ ...p, registration_fee: e.target.value }))
                     }
                     placeholder="0"
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.fees ? 'border-rose-400' : 'border-violet-200'} focus:ring-2 focus:ring-violet-300 focus:outline-none`}
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.registration_fee ? 'border-rose-400' : 'border-violet-200'} focus:ring-2 focus:ring-violet-300 focus:outline-none`}
                   />
-                  {formErrors.fees && <div className="text-xs text-rose-600 mb-1">{formErrors.fees}</div>}
+                  {formErrors.registration_fee && <div className="text-xs text-rose-600 mb-1">{formErrors.registration_fee}</div>}
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Participant Limit *</label>
                   <input
                     type="number"
                     min="1"
-                    value={showCreate ? eventDraft.seats : editDraft.seats}
+                    required
+                    value={showCreate ? formData.max_participants : editDraft.max_participants}
                     onChange={(e) =>
                       showCreate
-                        ? setEventDraft((p) => ({ ...p, seats: e.target.value }))
-                        : setEditDraft((p) => ({ ...p, seats: e.target.value }))
+                        ? setFormData((p) => ({ ...p, max_participants: e.target.value }))
+                        : setEditDraft((p) => ({ ...p, max_participants: e.target.value }))
                     }
                     placeholder="1"
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.seats ? 'border-rose-400' : 'border-violet-200'} focus:ring-2 focus:ring-violet-300 focus:outline-none`}
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.max_participants ? 'border-rose-400' : 'border-violet-200'} focus:ring-2 focus:ring-violet-300 focus:outline-none`}
                   />
-                  {formErrors.seats && <div className="text-xs text-rose-600 mb-1">{formErrors.seats}</div>}
+                  {formErrors.max_participants && <div className="text-xs text-rose-600 mb-1">{formErrors.max_participants}</div>}
                 </div>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer mt-2 p-2 rounded-lg border border-violet-100 bg-violet-50">
+                  <input
+                    type="checkbox"
+                    checked={showCreate ? formData.external_allowed : editDraft.external_allowed}
+                    onChange={(e) =>
+                      showCreate
+                        ? setFormData((p) => ({ ...p, external_allowed: e.target.checked }))
+                        : setEditDraft((p) => ({ ...p, external_allowed: e.target.checked }))
+                    }
+                    className="w-4 h-4 text-violet-600 bg-gray-100 border-gray-300 rounded focus:ring-violet-500 focus:ring-2"
+                  />
+                  <span className="text-sm font-semibold text-gray-700">External Entry (Non-VIT students allowed)</span>
+                </label>
               </div>
 
               <label className="block text-sm font-semibold text-gray-700 mb-1">Description *</label>
               <textarea
-                value={showCreate ? eventDraft.description : editDraft.description}
+                required
+                value={showCreate ? formData.description : editDraft.description}
                 onChange={(e) =>
                   showCreate
-                    ? setEventDraft((p) => ({ ...p, description: e.target.value }))
+                    ? setFormData((p) => ({ ...p, description: e.target.value }))
                     : setEditDraft((p) => ({ ...p, description: e.target.value }))
                 }
                 rows={3}
@@ -513,16 +582,80 @@ export default function ClubDashboard() {
 
               <input
                 type="hidden"
-                value={showCreate ? eventDraft.coordinator_remarks : editDraft.coordinator_remarks}
+                value={showCreate ? formData.coordinator_remarks : editDraft.coordinator_remarks}
                 readOnly
               />
+
+              {/* ✅ New Fields */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Club Name</label>
+                  <input
+                    value={showCreate ? formData.club_name : editDraft.club_name}
+                    onChange={(e) =>
+                      showCreate
+                        ? setFormData((p) => ({ ...p, club_name: e.target.value }))
+                        : setEditDraft((p) => ({ ...p, club_name: e.target.value }))
+                    }
+                    placeholder="e.g. CodeCell, Robotics Club"
+                    className="w-full px-3 py-2 rounded-lg border border-violet-200 focus:ring-2 focus:ring-violet-300 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Target Audience</label>
+                  <select
+                    value={showCreate ? formData.audience_type : editDraft.audience_type}
+                    onChange={(e) =>
+                      showCreate
+                        ? setFormData((p) => ({ ...p, audience_type: e.target.value }))
+                        : setEditDraft((p) => ({ ...p, audience_type: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 rounded-lg border border-violet-200 focus:ring-2 focus:ring-violet-300 focus:outline-none"
+                  >
+                    <option value="All">All</option>
+                    <option value="SE">SE (2nd Year)</option>
+                    <option value="TE">TE (3rd Year)</option>
+                    <option value="BE">BE (4th Year)</option>
+                    <option value="FE">FE (1st Year)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Special Guest</label>
+                <input
+                  value={showCreate ? formData.special_guest : editDraft.special_guest}
+                  onChange={(e) =>
+                    showCreate
+                      ? setFormData((p) => ({ ...p, special_guest: e.target.value }))
+                      : setEditDraft((p) => ({ ...p, special_guest: e.target.value }))
+                  }
+                  placeholder="e.g. Dr. John Doe, Industry Expert"
+                  className="w-full px-3 py-2 rounded-lg border border-violet-200 focus:ring-2 focus:ring-violet-300 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Amenities</label>
+                <input
+                  value={showCreate ? formData.amenities : editDraft.amenities}
+                  onChange={(e) =>
+                    showCreate
+                      ? setFormData((p) => ({ ...p, amenities: e.target.value }))
+                      : setEditDraft((p) => ({ ...p, amenities: e.target.value }))
+                  }
+                  placeholder="e.g. Lunch, T-shirt, Certificate"
+                  className="w-full px-3 py-2 rounded-lg border border-violet-200 focus:ring-2 focus:ring-violet-300 focus:outline-none"
+                />
+              </div>
             </div>
-            <div className="px-6 py-4 border-t border-violet-100 flex items-center justify-end gap-2">
+            <div className="px-6 py-4 border-t border-violet-100 flex items-center justify-end gap-2 flex-shrink-0">
               <button
                 onClick={() => {
                   setShowCreate(false)
                   setEditingEvent(null)
                   setFormErrors({})
+                  setPosterFile(null)
                 }}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold"
               >

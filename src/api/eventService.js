@@ -215,7 +215,7 @@ export const eventService = {
 
       // Prepare CSV headers
       const headers = ['ID', 'Name', 'Email', 'Phone', 'College Type', 'PRN', 'Department', 'Year', 'Division', 'Registered On'];
-      
+
       // Prepare CSV rows
       const rows = registrations.map(r => [
         r.id || '',
@@ -239,7 +239,7 @@ export const eventService = {
         ['Participant Details:'],
         headers,
         ...rows
-      ].map(row => 
+      ].map(row =>
         row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')
       ).join('\n');
 

@@ -75,49 +75,22 @@ export default function RegistrationModal({ event, user, onConfirm, onClose }) {
   const isNonVitian = !isGuest && (user?.college_type === "non_vitian" || user?.is_vitian === false)
   const showExternalForm = isGuest || isNonVitian
 
-  // Use REFS for text inputs
-  const firstNameRef      = useRef()
-  const lastNameRef       = useRef()
-  const emailRef          = useRef()
-  const phoneRef          = useRef()
-  const grNumberRef       = useRef()
-  const prnRef            = useRef()
-  const collegeNameRef    = useRef()
-  const collegeAddressRef = useRef()
-
-  const [department, setDepartment] = useState(user?.department || "")
-  const [year,       setYear]       = useState(user?.year       || "")
-  const [division,   setDivision]   = useState(user?.division   || "")
-  const [errors,     setErrors]     = useState({})
-
-  // Payment Information
-  const [receiptUrl, setReceiptUrl] = useState("");
-  const [transactionId, setTransactionId] = useState("");
-
-  const isFree = !event.fees || event.fees === "0" || event.fees?.toLowerCase() === "free"
-
-  // Pre-fill ref inputs once on mount
-  useEffect(() => {
-    if (!user) return
-    if (firstNameRef.current)    firstNameRef.current.value    = user.firstName || ""
-    if (lastNameRef.current)     lastNameRef.current.value     = user.lastName  || ""
-    if (emailRef.current)        emailRef.current.value        = user.email     || ""
-    if (phoneRef.current)        phoneRef.current.value        = user.phone     || ""
-    if (grNumberRef.current)     grNumberRef.current.value     = user.grNumber  || user.gr_number || ""
-    if (collegeNameRef.current)  collegeNameRef.current.value  = user.college_name || user.collegeName || ""
-  }, [user])
-
-  const getFormValues = () => ({
-    firstName:      firstNameRef.current?.value?.trim()      || "",
-    lastName:       lastNameRef.current?.value?.trim()       || "",
-    email:          emailRef.current?.value?.trim()          || "",
-    phone:          phoneRef.current?.value?.trim()          || "",
-    grNumber:       grNumberRef.current?.value?.trim()       || "",
-    prn:            prnRef.current?.value?.trim()            || "",
-    collegeName:    collegeNameRef.current?.value?.trim()    || "",
-    collegeAddress: collegeAddressRef.current?.value?.trim() || "",
-    department, year, division,
+  const [formData, setFormData] = useState({
+    firstName: user?.firstName || user?.first_name || user?.name?.split(' ')[0] || '',
+    lastName: user?.lastName || user?.last_name || user?.name?.split(' ').slice(1).join(' ') || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    department: user?.department || '',
+    grNumber: user?.grNumber || user?.gr_number || '',
+    collegeName: user?.college_name || user?.collegeName || '',
+    year: user?.year || '',
+    division: user?.division || '',
+    prn: user?.prn || '',
+    collegeAddress: user?.collegeAddress || ''
   })
+
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value })
+  const [errors, setErrors] = useState({})
 
   const validatePersonalInfo = (v) => {
     const e = {}
@@ -136,6 +109,14 @@ export default function RegistrationModal({ event, user, onConfirm, onClose }) {
     }
     return e
   }
+
+  // Payment Information
+  const [receiptUrl, setReceiptUrl] = useState("");
+  const [transactionId, setTransactionId] = useState("");
+
+  const rawFee = event?.registration_fee !== undefined && event?.registration_fee !== null ? event.registration_fee : event?.fees
+  const isFree = !rawFee || parseInt(rawFee) <= 0 || String(rawFee).toLowerCase() === 'free'
+  const feeDisplay = isFree ? 'Free' : `₹${parseInt(rawFee)}`
 
   const validatePaymentInfo = () => {
     const e = {}
@@ -173,18 +154,19 @@ export default function RegistrationModal({ event, user, onConfirm, onClose }) {
   const handleSubmit = async () => {
     try {
       setSubmitting(true)
-      const v = getFormValues()
       const payload = {
-        reg_name:         `${v.firstName} ${v.lastName}`,
-        reg_department:   v.department,
-        reg_division:     v.division,
-        reg_year:         v.year,
-        reg_gr_number:    v.grNumber,
-        reg_prn:          v.prn,
-        reg_phone:        v.phone,
-        reg_college_name: v.collegeName    || null,
-        reg_email:        v.email,
-        college_address:  v.collegeAddress || null,
+        student_id:       user?.id || null,
+        event_id:         event.id,
+        reg_name:         `${formData.firstName} ${formData.lastName}`,
+        reg_department:   formData.department,
+        reg_division:     formData.division,
+        reg_year:         formData.year,
+        reg_gr_number:    formData.grNumber,
+        reg_prn:          formData.prn,
+        reg_phone:        formData.phone,
+        reg_college_name: formData.collegeName    || null,
+        reg_email:        formData.email,
+        college_address:  formData.collegeAddress || null,
         is_external:      showExternalForm,
         receipt_image_url: receiptUrl || transactionId || null,
         verification_status: "pending", // [FIX] Payment verification pending
@@ -255,7 +237,7 @@ export default function RegistrationModal({ event, user, onConfirm, onClose }) {
                   {event.date && <div className="flex justify-between"><span className="font-semibold">📅 Date:</span> <span>{new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>}
                   {event.venue && <div className="flex justify-between"><span className="font-semibold">📍 Venue:</span> <span>{event.venue}</span></div>}
                   {event.category && <div className="flex justify-between"><span className="font-semibold">Category:</span> <span>{event.category}</span></div>}
-                  {!isFree && <div className="flex justify-between"><span className="font-semibold">💳 Fee:</span> <span className="text-amber-600 font-bold">₹{event.fees}</span></div>}
+                  {!isFree && <div className="flex justify-between"><span className="font-semibold">💳 Fee:</span> <span className="text-amber-600 font-bold">{feeDisplay}</span></div>}
                   {isFree && <div className="flex justify-between"><span className="font-semibold">Price:</span> <span className="text-green-600 font-bold">Free</span></div>}
                 </div>
                 {(event.ppt_url || event.details_url || event.attachment_url) && (
@@ -314,18 +296,34 @@ export default function RegistrationModal({ event, user, onConfirm, onClose }) {
             <>
               <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                 <h3 className="font-bold text-green-900 mb-3">👤 Your Information</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="font-semibold text-gray-700">Name:</span> <span className="text-gray-800">{firstNameRef.current?.value} {lastNameRef.current?.value}</span></div>
-                  <div className="flex justify-between"><span className="font-semibold text-gray-700">Email:</span> <span className="text-gray-800 text-xs">{emailRef.current?.value}</span></div>
-                  <div className="flex justify-between"><span className="font-semibold text-gray-700">Phone:</span> <span className="text-gray-800">{phoneRef.current?.value}</span></div>
-                  <div className="flex justify-between"><span className="font-semibold text-gray-700">Department:</span> <span className="text-gray-800">{department}</span></div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">First Name</label>
+                    <input name="firstName" value={formData.firstName} onChange={handleChange} className={ic("firstName")} disabled={!!user} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Last Name</label>
+                    <input name="lastName" value={formData.lastName} onChange={handleChange} className={ic("lastName")} disabled={!!user} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Email</label>
+                    <input name="email" type="email" value={formData.email} onChange={handleChange} className={ic("email")} disabled={!!user} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Phone</label>
+                    <input name="phone" value={formData.phone} onChange={handleChange} className={ic("phone")} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Department</label>
+                    <input name="department" value={formData.department} onChange={handleChange} className={ic("department")} disabled={!!user} />
+                  </div>
                 </div>
               </div>
 
               {!isFree && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                   <h3 className="font-bold text-amber-900 mb-3">💳 Payment Information</h3>
-                  <p className="text-xs text-amber-800 mb-3">Fee: <span className="font-bold">₹{event.fees}</span></p>
+                  <p className="text-xs text-amber-800 mb-3">Fee: <span className="font-bold">{feeDisplay}</span></p>
                   
                   <div className="space-y-3">
                     <div>
@@ -377,8 +375,8 @@ export default function RegistrationModal({ event, user, onConfirm, onClose }) {
                   </div>
                   <div className="border-b border-indigo-200 pb-3">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Participant</p>
-                    <p className="font-semibold text-gray-800">{firstNameRef.current?.value} {lastNameRef.current?.value}</p>
-                    <p className="text-xs text-gray-600">{emailRef.current?.value}</p>
+                    <p className="font-semibold text-gray-800">{formData.firstName} {formData.lastName}</p>
+                    <p className="text-xs text-gray-600">{formData.email}</p>
                   </div>
                   {!isFree && (
                     <div className="border-b border-indigo-200 pb-3">

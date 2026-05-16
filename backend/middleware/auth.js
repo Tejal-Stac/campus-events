@@ -24,7 +24,8 @@ const isDean = (req, res, next) => {
     return res.status(401).json({ message: 'Authentication required' })
   }
   
-  if (req.user.role !== 'dean') {
+  console.log("User Role Check (isDean):", req.user.role)
+  if (req.user.role?.toLowerCase() !== 'dean') {
     return res.status(403).json({ 
       message: 'Access denied. Dean role required.',
       userRole: req.user.role 
@@ -40,7 +41,8 @@ const isFacultyOrDean = (req, res, next) => {
     return res.status(401).json({ message: 'Authentication required' })
   }
   
-  if (!['faculty', 'dean'].includes(req.user.role)) {
+  console.log("User Role Check (isFacultyOrDean):", req.user.role)
+  if (!['faculty', 'dean'].includes(req.user.role?.toLowerCase())) {
     return res.status(403).json({ 
       message: 'Access denied. Faculty or Dean role required.',
       userRole: req.user.role 
@@ -56,7 +58,8 @@ const isClubPresident = (req, res, next) => {
     return res.status(401).json({ message: 'Authentication required' })
   }
   
-  if (req.user.role !== 'club_president') {
+  console.log("User Role Check (isClubPresident):", req.user.role)
+  if (req.user.role?.toLowerCase() !== 'club_president') {
     return res.status(403).json({ 
       message: 'Access denied. Club President role required.',
       userRole: req.user.role 
@@ -72,7 +75,8 @@ const isFacultyOrDeanOrClubPresident = (req, res, next) => {
     return res.status(401).json({ message: 'Authentication required' })
   }
   
-  if (!['faculty', 'dean', 'club_president'].includes(req.user.role)) {
+  console.log("User Role Check (isFacultyOrDeanOrClubPresident):", req.user.role)
+  if (!['faculty', 'dean', 'club_president'].includes(req.user.role?.toLowerCase())) {
     return res.status(403).json({ 
       message: 'Access denied. Faculty, Dean, or Club President role required.',
       userRole: req.user.role 

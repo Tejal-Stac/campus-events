@@ -118,6 +118,7 @@ const register = async (req, res) => {
  
 const login = async (req, res) => {
   const { email, password, role } = req.body
+  console.log("Login Attempt:", req.body)
  
   try {
     const result = await pool.query(

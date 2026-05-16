@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { getEventStatus } from '../utils/eventHelpers'
 
 /**
  * Universal EventCard Component
@@ -12,13 +13,14 @@ import React, { useState } from 'react'
  * @param {boolean} isOwner - Whether current user is the event owner (faculty only)
  * @param {boolean} readOnly - Whether to display read-only mode (dean oversight of approved events)
  */
-export default function EventCard({ event, role, onAction, isRegistered = false, userCollegeType = 'guest', isOwner = false, readOnly = false }) {
+export default function EventCard({ event, role, onAction, isRegistered = false, userCollegeType = 'guest', isOwner = false, readOnly = false, user = null }) {
   const [remarks, setRemarks] = useState('')
   const [imageError, setImageError] = useState(false)
   
   // ✅ LOGISTICAL DATA HELPERS (NEW)
-  const isFreeEvent = !event?.fees || event?.fees === 'Free' || event?.fees === '0'
-  const feeDisplay = isFreeEvent ? 'FREE' : `₹${event?.fees}`
+  const rawFee = event?.registration_fee !== undefined && event?.registration_fee !== null ? event.registration_fee : event?.fees
+  const isFreeEvent = !rawFee || parseInt(rawFee) <= 0 || String(rawFee).toLowerCase() === 'free'
+  const feeDisplay = isFreeEvent ? 'Free' : `₹${parseInt(rawFee)}`
   const organizingDept = event?.department || event?.organizing_dept || null
   const guestSpeaker = event?.special_guest || null
   const amenitiesList = event?.amenities && Array.isArray(event.amenities) ? event.amenities : []
@@ -158,7 +160,7 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
       ['Expected Count', event.expected_count || event.expectedCount || 'N/A'],
       [''],
       ['Financial:'],
-      ['Registration Fees', event.fees || 'Free'],
+      ['Registration Fees', feeDisplay],
       [''],
       ['Contact Information:'],
       ['Contact Person', event.contact || 'N/A'],
@@ -187,7 +189,11 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
   // Render action buttons based on role
   const renderActions = () => {
     if (role === 'student') {
-      const isRestricted = event.allow_external === false && userCollegeType === 'guest'
+      const isExternalAllowed = event.external_allowed !== undefined ? event.external_allowed : event.allow_external;
+      const isVitian = user && user.email && user.email.toLowerCase().endsWith('@vit.edu');
+      const isRestricted = isExternalAllowed === false && !isVitian;
+      const status = getEventStatus(event.start_date || event.event_date || event.date, event.end_date, event.is_closed);
+      const isClosed = status === 'past' || event.is_closed;
 
       if (isRegistered) {
         return (
@@ -198,6 +204,19 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             Already Registered
+          </button>
+        )
+      }
+
+      if (isClosed) {
+        return (
+          <button
+            disabled
+            className="w-full py-3 rounded-xl text-sm font-bold bg-gray-200 text-gray-500 cursor-not-allowed border-2 border-gray-300 flex items-center justify-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Registrations Closed
           </button>
         )
       }
@@ -360,6 +379,29 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
           </button>
         </div>
       )
+    }
+
+    if (role === 'club_president') {
+      const status = getEventStatus(event.start_date || event.event_date || event.date, event.end_date, event.is_closed);
+      if (status === 'past') {
+        return (
+          <div className="space-y-2">
+            <button
+              onClick={() => onAction && onAction('uploadReport', event.id)}
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 active:scale-95">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Upload Report
+            </button>
+            {event.report_url && (
+              <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700 font-medium">
+                ✅ Report Uploaded
+              </div>
+            )}
+          </div>
+        )
+      }
     }
     
     return null

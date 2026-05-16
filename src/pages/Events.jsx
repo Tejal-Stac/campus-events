@@ -6,6 +6,7 @@ import userService from "../api/userService";
 import Navbar from "../components/Navbar";
 import RegistrationModal from "../components/RegistrationModal";
 import EventCard from "../components/EventCard";
+import { groupEventsByStatus } from "../utils/eventHelpers";
 
 const CATEGORIES = ["All", "Hackathon", "Seminar", "Workshop", "Cultural", "Sports", "Technical"];
 const EVENT_TYPES = ["All", "National", "Intercollege", "Intracollege", "Department"];
@@ -31,7 +32,9 @@ export default function Events() {
       // Fetch APPROVED events (default status for student view)
       const eventsData = await eventService.getAllEvents();
       setEvents(eventsData || []);
-      console.log(`✅ Loaded ${eventsData?.length || 0} approved events for student view`);
+      if (eventsData && eventsData.length > 0) {
+        console.log(`✅ Loaded ${eventsData.length} events. First event sample:`, eventsData[0]);
+      }
 
       // Only fetch registrations if logged in
       if (user) {
@@ -89,6 +92,14 @@ export default function Events() {
       event.description?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchType && matchSearch;
   });
+
+  const grouped = groupEventsByStatus(filteredEvents)
+
+  const SECTIONS = [
+    { key: 'live',     label: '🔴 Live Now',    accent: 'border-red-400   bg-red-50',    badge: 'bg-red-500   text-white' },
+    { key: 'upcoming', label: '📅 Upcoming',     accent: 'border-violet-400 bg-violet-50', badge: 'bg-violet-500 text-white' },
+    { key: 'past',     label: '🏁 Past Events',  accent: 'border-gray-300   bg-gray-50',   badge: 'bg-gray-400   text-white' },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -159,29 +170,44 @@ export default function Events() {
           </div>
         ) : filteredEvents.length === 0 ? (
           <p className="text-center text-gray-400 py-16 text-lg">
-            {events.length === 0 
-              ? "🎉 No upcoming events approved yet. Events will appear here once approved by the Dean."
-              : "📌 No events match your filters. Try adjusting your selections."}
+            {events.length === 0
+              ? "🎉 No upcoming events approved yet."
+              : "📌 No events match your filters."}
           </p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEvents.map(event => (
-              <EventCard
-                key={event.id}
-                event={event}
-                role="student"
-                onAction={(action, eventId) => {
-                  if (action === 'register') {
-                    const selectedEvent = filteredEvents.find(item => item.id === eventId)
-                    if (selectedEvent) {
-                      handleRegisterClick(selectedEvent)
-                    }
-                  }
-                }}
-                isRegistered={isRegistered(event.id)}
-                userCollegeType={user?.college_type || 'guest'}
-              />
-            ))}
+          <div className="space-y-10">
+            {SECTIONS.map(({ key, label, accent, badge }) => {
+              const sectionEvents = grouped[key] || []
+              if (sectionEvents.length === 0) return null
+              return (
+                <section key={key}>
+                  <div className={`flex items-center gap-3 mb-4 pb-2 border-b-2 ${accent}`}>
+                    <h2 className="text-lg font-bold text-gray-800">{label}</h2>
+                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${badge}`}>
+                      {sectionEvents.length}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {sectionEvents.map(event => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        role="student"
+                        onAction={(action, eventId) => {
+                          if (action === 'register') {
+                            const ev = sectionEvents.find(e => e.id === eventId)
+                            if (ev) handleRegisterClick(ev)
+                          }
+                        }}
+                        isRegistered={isRegistered(event.id)}
+                        userCollegeType={user?.college_type || 'guest'}
+                        user={user}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
           </div>
         )}
       </div>

@@ -6,19 +6,19 @@ import userService from "../api/userService";
 import Navbar from "../components/Navbar";
 
 const EVENT_TYPE_STYLES = {
-  National:     "bg-red-100 text-red-700 border-red-200",
+  National: "bg-red-100 text-red-700 border-red-200",
   Intercollege: "bg-purple-100 text-purple-700 border-purple-200",
   Intracollege: "bg-blue-100 text-blue-700 border-blue-200",
-  Department:   "bg-green-100 text-green-700 border-green-200",
+  Department: "bg-green-100 text-green-700 border-green-200",
 };
 const EVENT_TYPE_ICONS = {
   National: "🏆", Intercollege: "🎓", Intracollege: "🏫", Department: "📚",
 };
 const EVENT_TYPE_COLORS = {
-  National:     { bg: "bg-red-50",    border: "border-red-200",    active: "border-red-400",    text: "text-red-700"    },
+  National: { bg: "bg-red-50", border: "border-red-200", active: "border-red-400", text: "text-red-700" },
   Intercollege: { bg: "bg-purple-50", border: "border-purple-200", active: "border-purple-400", text: "text-purple-700" },
-  Intracollege: { bg: "bg-blue-50",   border: "border-blue-200",   active: "border-blue-400",   text: "text-blue-700"   },
-  Department:   { bg: "bg-green-50",  border: "border-green-200",  active: "border-green-400",  text: "text-green-700"  },
+  Intracollege: { bg: "bg-blue-50", border: "border-blue-200", active: "border-blue-400", text: "text-blue-700" },
+  Department: { bg: "bg-green-50", border: "border-green-200", active: "border-green-400", text: "text-green-700" },
 };
 const EVENT_TYPES = ["All", "National", "Intercollege", "Intracollege", "Department"];
 
@@ -107,8 +107,8 @@ export default function StudentDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard label="Total Points" value={user?.points || 0} icon="⭐" color="bg-yellow-50 border-yellow-200" />
-          <StatCard label="Registered"   value={registeredEvents.length} icon="📋" color="bg-blue-50 border-blue-200" />
-          <StatCard label="Upcoming"     value={events.filter(e => new Date(e.date) > new Date()).length} icon="📅" color="bg-purple-50 border-purple-200" />
+          <StatCard label="Registered" value={registeredEvents.length} icon="📋" color="bg-blue-50 border-blue-200" />
+          <StatCard label="Upcoming" value={events.filter(e => new Date(e.date) > new Date()).length} icon="📅" color="bg-purple-50 border-purple-200" />
           <StatCard label="Certificates" value={0} icon="🏅" color="bg-green-50 border-green-200" />
         </div>
 
@@ -220,7 +220,8 @@ export default function StudentDashboard() {
 function RegisteredEventRow({ event, onViewTicket }) {
   const registeredCount = event.registered_count || 0;
   const maxParticipants = event.max_participants || event.seats || 100;
-  const isPaid = event.fees && event.fees !== "Free" && event.fees !== "0";
+  const rawFee = event?.registration_fee !== undefined && event?.registration_fee !== null ? event.registration_fee : event?.fees;
+  const isPaid = rawFee && parseInt(rawFee) > 0 && String(rawFee).toLowerCase() !== "free";
 
   return (
     <div className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition">
@@ -286,7 +287,9 @@ function EventRow({ event, isRegistered, onViewTicket }) {
 }
 
 function TicketModal({ event, user, regDetail, onClose }) {
-  const isPaid = event.fees && event.fees !== "Free" && event.fees !== "0";
+  const rawFee = event?.registration_fee !== undefined && event?.registration_fee !== null ? event.registration_fee : event?.fees;
+  const isPaid = rawFee && parseInt(rawFee) > 0 && String(rawFee).toLowerCase() !== "free";
+  const feeDisplay = isPaid ? `₹${parseInt(rawFee)}` : "Free";
   const ticketId = `EVT-${event.id}-USR-${user?.id}`;
   const registeredCount = event.registered_count || 0;
   const maxParticipants = event.max_participants || event.seats || 100;
@@ -327,7 +330,7 @@ function TicketModal({ event, user, regDetail, onClose }) {
             {[
               { label: "Date", value: new Date(event.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }), icon: "📅" },
               { label: "Venue", value: event.location || event.venue || "TBA", icon: "📍" },
-              { label: "Fee", value: event.fees || "Free", icon: "💰", highlight: isPaid },
+              { label: "Fee", value: feeDisplay, icon: "💰", highlight: isPaid },
               { label: "Registered", value: `${registeredCount} / ${maxParticipants}`, icon: "👥" },
             ].map(({ label, value, icon, highlight }) => (
               <div key={label} className="bg-gray-50 rounded-xl p-3">
@@ -341,13 +344,13 @@ function TicketModal({ event, user, regDetail, onClose }) {
             <p className="text-xs font-bold text-indigo-700 mb-2 uppercase tracking-wider">Registrant Details</p>
             <div className="space-y-1.5">
               {[
-                { label: "Name",       value: `${user?.firstName || ""} ${user?.lastName || ""}`.trim() },
-                { label: "Email",      value: user?.email },
-                { label: "Phone",      value: regDetail?.reg_phone || user?.phone || "—" },
+                { label: "Name", value: `${user?.firstName || ""} ${user?.lastName || ""}`.trim() },
+                { label: "Email", value: user?.email },
+                { label: "Phone", value: regDetail?.reg_phone || user?.phone || "—" },
                 { label: "Department", value: regDetail?.reg_department || user?.department || "—" },
-                { label: "Year",       value: regDetail?.reg_year || user?.year || "—" },
-                { label: "GR / Roll",  value: regDetail?.reg_gr_number || user?.grNumber || "—" },
-                { label: "PRN",        value: regDetail?.reg_prn || "—" },
+                { label: "Year", value: regDetail?.reg_year || user?.year || "—" },
+                { label: "GR / Roll", value: regDetail?.reg_gr_number || user?.grNumber || "—" },
+                { label: "PRN", value: regDetail?.reg_prn || "—" },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between text-xs">
                   <span className="text-gray-500">{label}</span>
@@ -367,11 +370,11 @@ function TicketModal({ event, user, regDetail, onClose }) {
               <p className="text-orange-800 font-bold text-sm mb-2">💳 Payment Required</p>
               <img
                 src={event.payment_qr_url ||
-                  `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=PAY:${encodeURIComponent(event.title)}:${event.fees}`}
+                  `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=PAY:${encodeURIComponent(event.title)}:${feeDisplay}`}
                 alt="Payment QR"
                 className="w-36 h-36 mx-auto rounded-lg border border-orange-200 bg-white p-1"
               />
-              <p className="text-orange-700 text-xs mt-2">Amount: <strong>{event.fees}</strong></p>
+              <p className="text-orange-700 text-xs mt-2">Amount: <strong>{feeDisplay}</strong></p>
             </div>
           )}
 

@@ -93,14 +93,18 @@ const createEvent = async (req, res) => {
     timeFrom, timeTo, venue, onlineLink, targetAudience,
     expectedCount, seats, fees, contact, category,
     keyFeatures, desc, event_type, allow_external, payment_qr_url,
-    organizing_dept, special_guest, amenities
+    organizing_dept, special_guest, amenities,
+    start_date, end_date, is_closed,
+    club_name, audience_type, registration_fee
   } = req.body
+  
+  const poster_url = req.file ? `/uploads/posters/${req.file.filename}` : req.body.poster_url
 
-  if (!title || !date || !venue) {
+  if (!title || (!date && !start_date) || !venue) {
     return res.status(400).json({
       success: false,
       message: 'Missing required fields',
-      required: ['title', 'date', 'venue']
+      required: ['title', 'date or start_date', 'venue']
     })
   }
 
@@ -117,7 +121,6 @@ const createEvent = async (req, res) => {
       ? featuresString.split(',').map(k => k.trim()).filter(k => k)
       : []
 
-    // Handle amenities as JSON array
     let amenitiesArray = null
     if (amenities && Array.isArray(amenities) && amenities.length > 0) {
       amenitiesArray = JSON.stringify(amenities)
@@ -128,22 +131,24 @@ const createEvent = async (req, res) => {
         (title, organising_club, sa_vertical, date, day,
          time_from, time_to, venue, online_link, target_audience,
          expected_count, seats, fees, contact, category,
-         key_features, description, event_type, faculty_id, status,
-         allow_external, payment_qr_url, department, special_guest, amenities)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pending',$20,$21,$22,$23,$24)
+         key_features, description, event_type, faculty_id, creator_id, status,
+         allow_external, payment_qr_url, department, special_guest, amenities,
+         start_date, end_date, is_closed, poster_url, club_name, audience_type, registration_fee)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'pending',$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
        RETURNING *`,
       [
-        title, organisingClub || null, saVertical || null, date, day || null,
+        title, organisingClub || null, saVertical || null, date || start_date || null, day || null,
         timeFrom || null, timeTo || null, venue, onlineLink || null,
         targetAudience || 'All', expectedCount || 0, seats || 100,
         fees || 'Free', contact || null, category || 'General',
         JSON.stringify(featuresArray), desc || null, resolvedEventType,
-        req.user.id, allow_external || false, payment_qr_url || null,
-        organizing_dept || null, special_guest || null, amenitiesArray
+        req.user.id, req.user.id, allow_external || false, payment_qr_url || null,
+        organizing_dept || null, special_guest || null, amenitiesArray,
+        start_date || null, end_date || null, is_closed === 'true' || is_closed === true || false, poster_url || null, club_name || null, audience_type || null, registration_fee || 0
       ]
     )
 
-    console.log(`✅ Event created: "${title}" by user ${req.user.id} - Department: ${organizing_dept || 'Not specified'}`)
+    console.log(`✅ Event created: "${title}" by user ${req.user.id}`)
     res.status(201).json({
       success: true,
       message: 'Event submitted for Dean approval!',
@@ -224,19 +229,29 @@ const updateEventType = async (req, res) => {
 }
 
 const registerForEvent = async (req, res) => {
-  const eventId = req.params.id
-  const userId = req.user ? req.user.id : null
-  const { receipt_image_url, verification_status } = req.body || {}
+  console.log("Reg Request:", req.body)
+  const eventId = req.params.id || req.body.event_id
+  const userId = req.body.student_id ? parseInt(req.body.student_id, 10) : (req.user ? req.user.id : null)
+  const {
+    receipt_image_url, verification_status,
+    reg_name, reg_department, reg_division, reg_year,
+    reg_gr_number, reg_prn, reg_phone, reg_college_name,
+    is_external
+  } = req.body
 
   try {
     const eventResult = await pool.query(
-      'SELECT id, title, organising_club, seats, fees, date, venue, allow_external FROM events WHERE id = $1',
+      'SELECT id, title, organising_club, seats, fees, date, venue, allow_external, is_closed FROM events WHERE id = $1',
       [eventId]
     )
     if (eventResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Event not found' })
     }
     const event = eventResult.rows[0]
+
+    if (event.is_closed) {
+      return res.status(400).json({ success: false, message: 'Registration Closed' })
+    }
 
     if (userId) {
       const userResult = await pool.query('SELECT college_type FROM users WHERE id = $1', [userId])
@@ -264,11 +279,23 @@ const registerForEvent = async (req, res) => {
       ? verification_status
       : 'pending'
 
+    const paymentStatus = (event.fees === 'Free' || event.fees === 0 || event.fees === '0') ? 'completed' : 'pending'
+
     const registrationInsert = await pool.query(
-      `INSERT INTO registrations (event_id, user_id, status, receipt_image_url, verification_status)
-       VALUES ($1, $2, 'confirmed', $3, $4)
+      `INSERT INTO registrations (
+         event_id, user_id, status, receipt_image_url, verification_status,
+         reg_name, reg_department, reg_division, reg_year,
+         reg_gr_number, reg_prn, reg_phone, reg_college_name,
+         is_external, payment_status, attended
+       )
+       VALUES ($1, $2, 'confirmed', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, false)
        RETURNING id, event_id, user_id, verification_status, receipt_image_url`,
-      [eventId, userId, receipt_image_url || null, normalizedVerificationStatus]
+      [
+        eventId, userId, receipt_image_url || null, normalizedVerificationStatus,
+        reg_name || null, reg_department || null, reg_division || null, reg_year || null,
+        reg_gr_number || null, reg_prn || null, reg_phone || null, reg_college_name || null,
+        is_external || false, paymentStatus
+      ]
     )
 
     console.log(`✅ User ${userId} registered for event ${eventId} (${event.title})`)
@@ -606,11 +633,97 @@ const verifyStudentRegistration = async (req, res) => {
   }
 }
 
+const getRegistrationsForPresident = async (req, res) => {
+  try {
+    const { presidentId } = req.params;
+    const result = await pool.query(`
+      SELECT r.*, e.title as event_title, u.first_name || ' ' || u.last_name as student_name
+      FROM registrations r
+      JOIN events e ON r.event_id = e.id
+      JOIN users u ON r.user_id = u.id
+      WHERE e.creator_id = $1 OR e.faculty_id = $1
+      ORDER BY r.created_at DESC
+    `, [presidentId]);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+}
+
+const closeEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_closed } = req.body;
+    
+    // Check permission
+    const eventCheck = await pool.query('SELECT faculty_id, creator_id FROM events WHERE id = $1', [id]);
+    if (eventCheck.rows.length === 0) return res.status(404).json({ success: false, message: 'Event not found' });
+    const event = eventCheck.rows[0];
+    
+    const isAdminOrFaculty = ['admin', 'faculty', 'dean'].includes(req.user.role.toLowerCase());
+    const isOwner = event.creator_id === req.user.id;
+    
+    if (!isAdminOrFaculty && !isOwner) {
+      return res.status(403).json({ success: false, message: 'Unauthorized: Only faculty, admin, or the event creator can close this event.' });
+    }
+
+    const result = await pool.query(
+      'UPDATE events SET is_closed = $1 WHERE id = $2 RETURNING *',
+      [is_closed, id]
+    );
+    res.json({ success: true, message: 'Event status updated', data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+}
+
+const exportEventCsv = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check permission
+    const eventCheck = await pool.query('SELECT title, faculty_id, creator_id, coordinator_id FROM events WHERE id = $1', [id]);
+    if (eventCheck.rows.length === 0) return res.status(404).json({ success: false, message: 'Event not found' });
+    const event = eventCheck.rows[0];
+    
+    if (event.faculty_id !== req.user.id && event.creator_id !== req.user.id && event.coordinator_id !== req.user.id && req.user.role !== 'dean') {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const result = await pool.query(`
+      SELECT u.first_name || ' ' || u.last_name as "Name",
+             u.email as "Email",
+             u.phone as "Phone",
+             u.department as "Department",
+             u.college_type as "College Type",
+             r.registered_at as "Registration Date",
+             r.attended as "Attended",
+             r.status as "Registration Status"
+      FROM registrations r
+      JOIN users u ON r.user_id = u.id
+      WHERE r.event_id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'No registrations found' });
+    }
+
+    const { parse } = require('json2csv');
+    const csv = parse(result.rows);
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`${event.title.replace(/\s+/g, '_')}_attendees.csv`);
+    return res.send(csv);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+}
+
 module.exports = {
   getAllEvents, getPendingEvents, getEventById, createEvent,
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,
   getPendingApprovals, approveNonVitian, rejectNonVitian,
-  getPendingEventsByCategory, approveEvent, rejectEvent, verifyStudentRegistration
+  getPendingEventsByCategory, approveEvent, rejectEvent, verifyStudentRegistration,
+  getRegistrationsForPresident, closeEvent, exportEventCsv
 }

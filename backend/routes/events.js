@@ -1,17 +1,21 @@
-﻿const express = require('express')
+const express = require('express')
 const router = express.Router()
 const PDFDocument = require('pdfkit')
 const pool = require('../config/db')
 const auth = require('../middleware/auth')
 const { isDean, isFacultyOrDean, isFacultyOrDeanOrClubPresident } = require('../middleware/auth')
 const optionalAuth = require('../middleware/optionalAuth')
+const posterUpload = require('../middleware/posterUpload')
 const {
   getAllEvents, getPendingEvents, getEventById, createEvent,
   updateEventStatus, updateEventType,
   registerForEvent, getEventRegistrations,
   getCoordinatorStats, getCoordinatorVolunteers,
   getPendingApprovals, approveNonVitian, rejectNonVitian,
-  getPendingEventsByCategory, approveEvent, rejectEvent, verifyStudentRegistration
+  getPendingEventsByCategory, approveEvent, rejectEvent, verifyStudentRegistration,
+  getRegistrationsForPresident,
+  closeEvent,
+  exportEventCsv
 } = require('../controllers/eventController')
 
 router.get('/', optionalAuth, getAllEvents)
@@ -26,6 +30,8 @@ router.put('/:eventId/approve', auth, approveEvent)
 router.put('/:eventId/reject', auth, rejectEvent)
 router.put('/registrations/:registrationId/verify', auth, verifyStudentRegistration)
 router.patch('/registrations/:registrationId/verify', auth, verifyStudentRegistration)
+// ✅ Club President: fetch all registrations for events they created (uses creator_id)
+router.get('/registrations/managed/:presidentId', auth, getRegistrationsForPresident)
 
 router.get('/generate/:eventId', auth, async (req, res) => {
   try {
@@ -84,7 +90,7 @@ router.get('/generate/:eventId', auth, async (req, res) => {
 })
 
 router.get('/:id', getEventById)
-router.post('/', auth, isFacultyOrDeanOrClubPresident, createEvent)
+router.post('/', auth, isFacultyOrDeanOrClubPresident, posterUpload.single('poster'), createEvent)
 
 router.put('/:eventId', auth, isFacultyOrDeanOrClubPresident, async (req, res) => {
   try {
@@ -104,6 +110,8 @@ router.put('/:eventId', auth, isFacultyOrDeanOrClubPresident, async (req, res) =
 
 router.put('/:id/status', auth, isDean, updateEventStatus)
 router.patch('/:id/event-type', auth, updateEventType)
+router.patch('/:id/close', auth, closeEvent)
+router.get('/:id/export-csv', auth, exportEventCsv)
 router.post('/:id/register', optionalAuth, registerForEvent)
 router.get('/:id/registrations', auth, getEventRegistrations)
 

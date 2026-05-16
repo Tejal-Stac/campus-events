@@ -4,10 +4,14 @@ require('dotenv').config()
 const auth = require('./middleware/auth')
 const { verifyStudentRegistration } = require('./controllers/eventController')
 
+const path = require('path')
+
 const app = express()
 
 app.use(cors())
 app.use(express.json())
+// Serve uploaded files (event posters, PPTs, etc.)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
 // Request logging middleware
 app.use((req, res, next) => {

@@ -33,19 +33,23 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password, role) => {
     try {
       const { token, user } = await authService.login(email, password, role)
-      
+
       // Store token and user synchronously to prevent race conditions
       localStorage.setItem('token', token)
       localStorage.setItem('user', JSON.stringify(user))
-      
+
       // Update state synchronously
       setToken(token)
       setUser(user)
-      
+
       console.log('✅ AuthContext: User logged in:', user)
       return user
     } catch (error) {
       console.error('❌ AuthContext: Login failed:', error)
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      setToken(null)
+      setUser(null)
       throw error
     }
   }

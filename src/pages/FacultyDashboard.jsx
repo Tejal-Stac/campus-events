@@ -504,6 +504,7 @@ export default function FacultyDashboard() {
             { id: 'overview', label: '📊 Overview' },
             { id: 'events', label: '📅 All Events' },
             { id: 'students', label: '👥 My Students' },
+            { id: 'insights', label: '📈 Insights & Reports' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -752,6 +753,108 @@ export default function FacultyDashboard() {
                   ) : null}
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {/* Insights & Reports Tab */}
+        {activeTab === 'insights' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">📈 Insights & Reports</h2>
+              <p className="text-gray-500">Track attendance and manage your event lifecycle</p>
+            </div>
+
+            {events.filter(e => e.created_by === user?.id || e.faculty_id === user?.id || e.coordinator_id === user?.id).length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
+                <div className="text-4xl mb-4">📭</div>
+                <p className="text-gray-500 text-lg font-medium">No events to manage</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {events.filter(e => e.created_by === user?.id || e.faculty_id === user?.id || e.coordinator_id === user?.id).map(event => (
+                  <div key={event.id} className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col justify-between shadow-sm">
+                    <div>
+                      <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-lg font-bold text-gray-900 line-clamp-1" title={event.title}>{event.title}</h3>
+                        {event.is_closed ? (
+                          <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-semibold whitespace-nowrap">Registrations Closed</span>
+                        ) : (
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold whitespace-nowrap">
+                            <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse mr-1"></span>
+                            Live
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+                          <p className="text-xs text-indigo-600 font-semibold uppercase">Registrations</p>
+                          <p className="text-3xl font-bold text-indigo-900 mt-1">{event.registered_count || 0}</p>
+                        </div>
+                        <div className="bg-teal-50 rounded-xl p-4 border border-teal-100">
+                          <p className="text-xs text-teal-600 font-semibold uppercase">Attendance</p>
+                          <p className="text-3xl font-bold text-teal-900 mt-1">{event.attendance_count || 0}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex gap-3">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/events/${event.id}/export-csv`, { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' });
+                              const url = window.URL.createObjectURL(new Blob([res.data]));
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.setAttribute('download', `${event.title.replace(/\s+/g, '_')}_attendees.csv`);
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            } catch (err) {
+                              // Fallback if API fails: try fetching participants and creating CSV manually
+                              handleViewParticipants(event.id, event.title);
+                            }
+                          }}
+                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-semibold transition"
+                        >
+                          Download Attendee List
+                        </button>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Are you sure you want to ${event.is_closed ? 'open' : 'close'} registrations for this event?`)) return;
+                            try {
+                              await axios.patch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/events/${event.id}/close`, { is_closed: !event.is_closed }, { headers: { Authorization: `Bearer ${token}` } });
+                              setEvents(events.map(e => e.id === event.id ? { ...e, is_closed: !event.is_closed } : e));
+                              showAlert(`Event ${!event.is_closed ? 'closed' : 'opened'} successfully`, 'success');
+                            } catch (err) {
+                              showAlert('Failed to update event status', 'error');
+                            }
+                          }}
+                          className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${event.is_closed ? 'border-gray-300 text-gray-700 hover:bg-gray-50' : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'}`}
+                        >
+                          {event.is_closed ? 'Re-open Event' : 'Close Event'}
+                        </button>
+
+                        {event.report_url && (
+                          <a
+                            href={event.report_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex-1 text-center bg-purple-100 hover:bg-purple-200 text-purple-700 py-2 rounded-lg text-sm font-semibold transition"
+                          >
+                            Download Report
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
