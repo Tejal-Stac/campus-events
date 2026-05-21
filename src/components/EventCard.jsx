@@ -16,6 +16,12 @@ import { getEventStatus } from '../utils/eventHelpers'
 export default function EventCard({ event, role, onAction, isRegistered = false, userCollegeType = 'guest', isOwner = false, readOnly = false, user = null }) {
   const [remarks, setRemarks] = useState('')
   const [imageError, setImageError] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState('idle')
+  const [uploadedUrl, setUploadedUrl] = useState(null)
+  
+  // Check if a report path already exists from the backend data fetch
+  const existingReportUrl = event.report_url || event.report
+  const hasExistingReport = !!existingReportUrl
   
   // ✅ LOGISTICAL DATA HELPERS (NEW)
   const rawFee = event?.registration_fee !== undefined && event?.registration_fee !== null ? event.registration_fee : event?.fees
@@ -386,18 +392,61 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
       if (status === 'past') {
         return (
           <div className="space-y-2">
-            <button
-              onClick={() => onAction && onAction('uploadReport', event.id)}
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 active:scale-95">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              Upload Report
-            </button>
-            {event.report_url && (
-              <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700 font-medium">
-                ✅ Report Uploaded
-              </div>
+            {uploadStatus === 'idle' && !hasExistingReport && (
+              <label className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 active:scale-95 cursor-pointer">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Upload Report
+                <input type="file" accept=".pdf,.odf,.docx,.doc" className="hidden" onChange={async (e) => {
+                  const file = e.target.files[0]
+                  if (!file) return
+                  setUploadStatus('uploading')
+                  try {
+                    const formData = new FormData();
+                    formData.append('report', file);
+                    formData.append('eventId', event.id);
+
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/events/${event.id}/upload-report`, {
+                      method: 'POST',
+                      headers: { Authorization: `Bearer ${token}` },
+                      body: formData
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('Upload failed');
+                    }
+
+                    const data = await response.json();
+                    
+                    setUploadedUrl(data.report_url);
+                    setUploadStatus('success');
+                    if (onAction) onAction('reportUploaded', event.id, data.report_url);
+                  } catch (err) {
+                    setUploadStatus('idle');
+                    console.error('Failed to upload report', err);
+                    alert('Failed to upload report. Please try again.');
+                  }
+                }} />
+              </label>
+            )}
+            
+            {uploadStatus === 'uploading' && (
+              <button disabled className="w-full bg-gray-400 text-white py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed">
+                🔄 Uploading...
+              </button>
+            )}
+
+            {(uploadStatus === 'success' || hasExistingReport) && (
+              <a 
+                href={uploadedUrl || existingReportUrl || '#'} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="block w-full px-3 py-2.5 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 font-bold text-center hover:bg-green-100 transition"
+              >
+                📄 View Uploaded Report
+              </a>
             )}
           </div>
         )

@@ -49,8 +49,7 @@ export default function FacultyDashboard() {
   const [participants, setParticipants] = useState([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [participantsError, setParticipantsError] = useState(null);
-  const [rejectedEvents, setRejectedEvents] = useState([]);
-  const [verifyingRegistrationId, setVerifyingRegistrationId] = useState(null);
+
 
   useEffect(() => {
     if (user && user.role !== "faculty") {
@@ -164,26 +163,7 @@ export default function FacultyDashboard() {
     }
   };
 
-  const handleVerifyStudent = async (registrationId) => {
-    try {
-      const response = await axios.put(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/events/registrations/${registrationId}/verify`,
-        { verification_status: 'verified' },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      showAlert('✅ Student verified successfully!', 'success');
-      
-      // Update participants list
-      const updatedParticipants = participants.map(p => 
-        p.id === registrationId ? { ...p, verification_status: 'verified' } : p
-      );
-      setParticipants(updatedParticipants);
-      setVerifyingRegistrationId(null);
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to verify student';
-      showAlert(errorMsg, 'error');
-    }
-  };
+
 
   const fetchEvents = async () => {
     try {
@@ -503,7 +483,7 @@ export default function FacultyDashboard() {
           {[ 
             { id: 'overview', label: '📊 Overview' },
             { id: 'events', label: '📅 All Events' },
-            { id: 'students', label: '👥 My Students' },
+
             { id: 'insights', label: '📈 Insights & Reports' },
           ].map(tab => (
             <button
@@ -610,254 +590,150 @@ export default function FacultyDashboard() {
           </div>
         )}
 
-        {/* My Students Tab - Phase 2 */}
-        {activeTab === 'students' && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">👥 My Students</h2>
-              <p className="text-gray-500">Verify student registrations for your events</p>
-            </div>
-
-            {events.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
-                <div className="text-4xl mb-4">📭</div>
-                <p className="text-gray-500 text-lg font-medium">No events created yet</p>
-                <p className="text-gray-400 text-sm mt-2">Create an event to see registered students here</p>
+        {/* Insights & Reports Tab - Coordinator Hub */}
+        {activeTab === 'insights' && (() => {
+          if (user?.role !== 'faculty') {
+            return (
+              <div className="flex flex-col items-center justify-center py-24 px-6 bg-white rounded-2xl border border-gray-100">
+                <div style={{ fontSize: '4rem', lineHeight: 1 }} className="mb-5">🔒</div>
+                <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Access Denied</h2>
+                <p className="text-gray-500 text-center max-w-md">
+                  This section is restricted to Vertical Event Coordinators. Your current role is <span className="font-bold text-gray-700">{user?.role}</span>.
+                </p>
               </div>
-            ) : (
-              events.map(event => (
-                <div key={event.id} className="bg-white rounded-2xl border border-gray-100 p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">{event.title}</h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        📅 {new Date(event.date).toLocaleDateString('en-IN')} • 📍 {event.venue}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      {event.status === 'rejected' && (
-                        <span className="bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold">
-                          ❌ Rejected
-                        </span>
-                      )}
-                      {event.status === 'approved' && (
-                        <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-semibold">
-                          ✅ Approved
-                        </span>
-                      )}
-                      {event.status === 'pending' && (
-                        <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-semibold">
-                          ⏳ Pending
-                        </span>
-                      )}
-                    </div>
-                  </div>
+            );
+          }
 
-                  {/* Show rejection reason if rejected */}
-                  {event.status === 'rejected' && event.coordinator_remarks && (
-                    <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg">
-                      <p className="text-sm font-semibold text-rose-900">💬 Coordinator Feedback:</p>
-                      <p className="text-sm text-rose-800 mt-1">{event.coordinator_remarks}</p>
-                      <button
-                        onClick={() => {
-                          setEditingEventId(event.id);
-                          setNewEvent({
-                            ...newEvent,
-                            title: event.title,
-                            date: event.date,
-                            category: event.category,
-                            seats: String(event.seats),
-                            venue: event.venue,
-                            desc: event.description,
-                            event_type: event.event_type,
-                          });
-                          setActiveTab('create');
-                        }}
-                        className="mt-2 px-4 py-2 bg-rose-600 text-white text-sm rounded-lg font-semibold hover:bg-rose-700 transition"
-                      >
-                        ✏️ Edit & Resubmit
-                      </button>
-                    </div>
-                  )}
+          const myEvents = events.filter(e => e.created_by === user?.id || e.faculty_id === user?.id || e.coordinator_id === user?.id);
 
-                  {/* Participants Table */}
-                  {participants.length === 0 ? (
-                    <div className="text-center py-8 bg-gray-50 rounded-lg">
-                      <p className="text-gray-500">No students registered yet</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Student Name</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Phone</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Receipt</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {participants.map(participant => (
-                            <tr key={participant.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-gray-900">{participant.name || participant.email}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{participant.email}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{participant.phone || '-'}</td>
-                              <td className="px-4 py-3">
-                                <span className={`px-3 py-1 text-xs rounded-full font-semibold ${
-                                  participant.verification_status === 'verified'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : participant.verification_status === 'rejected'
-                                    ? 'bg-rose-100 text-rose-800'
-                                    : 'bg-amber-100 text-amber-800'
-                                }`}>
-                                  {participant.verification_status === 'verified' ? '✅ Verified' : 
-                                   participant.verification_status === 'rejected' ? '❌ Rejected' : 
-                                   '⏳ Pending'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                {participant.receipt_image_url ? (
-                                  <a href={participant.receipt_image_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 font-semibold text-sm">
-                                    📸 View
-                                  </a>
-                                ) : (
-                                  <span className="text-gray-400 text-sm">No receipt</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3">
-                                <button
-                                  onClick={() => setVerifyingRegistrationId(participant.id)}
-                                  disabled={participant.verification_status === 'verified'}
-                                  className="px-3 py-1 bg-emerald-500 text-white text-sm rounded-lg font-semibold hover:bg-emerald-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                >
-                                  {participant.verification_status === 'verified' ? '✓ Verified' : 'Verify'}
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+          return (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">📈 Insights & Reports</h2>
+                <p className="text-gray-500">Track attendance and manage your event lifecycle</p>
+              </div>
 
-                  {/* Button to view participants if not already viewing */}
-                  {!viewingParticipants || viewingParticipants.id !== event.id ? (
-                    <button
-                      onClick={() => handleViewParticipants(event.id, event.title)}
-                      className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
-                    >
-                      👁️ View All Registrations
-                    </button>
-                  ) : null}
+              {myEvents.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
+                  <div className="text-4xl mb-4">📭</div>
+                  <p className="text-gray-500 text-lg font-medium">No events to manage</p>
                 </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* Insights & Reports Tab */}
-        {activeTab === 'insights' && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">📈 Insights & Reports</h2>
-              <p className="text-gray-500">Track attendance and manage your event lifecycle</p>
-            </div>
-
-            {events.filter(e => e.created_by === user?.id || e.faculty_id === user?.id || e.coordinator_id === user?.id).length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
-                <div className="text-4xl mb-4">📭</div>
-                <p className="text-gray-500 text-lg font-medium">No events to manage</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {events.filter(e => e.created_by === user?.id || e.faculty_id === user?.id || e.coordinator_id === user?.id).map(event => (
-                  <div key={event.id} className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col justify-between shadow-sm">
-                    <div>
-                      <div className="flex justify-between items-start mb-4">
-                        <h3 className="text-lg font-bold text-gray-900 line-clamp-1" title={event.title}>{event.title}</h3>
-                        {event.is_closed ? (
-                          <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-semibold whitespace-nowrap">Registrations Closed</span>
-                        ) : (
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold whitespace-nowrap">
-                            <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse mr-1"></span>
-                            Live
-                          </span>
-                        )}
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {myEvents.map(event => (
+                    <div key={event.id} className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col justify-between shadow-sm">
+                      <div>
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="text-lg font-bold text-gray-900 line-clamp-1" title={event.title}>{event.title}</h3>
+                          {event.is_closed ? (
+                            <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-semibold whitespace-nowrap border border-red-200 shadow-sm">
+                              🔒 Closed
+                            </span>
+                          ) : (
+                            <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold whitespace-nowrap border border-green-200 shadow-sm">
+                              🟢 Open
+                            </span>
+                          )}
+                        </div>
+                        
+                        <p className="text-sm text-gray-600 mb-4 font-medium">
+                          📅 {event.date ? new Date(event.date).toLocaleDateString('en-IN') : 'TBA'} • 📍 {event.venue || event.location || 'TBA'}
+                        </p>
+                        
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                          <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+                            <p className="text-xs text-indigo-600 font-semibold uppercase">Total Registration</p>
+                            <p className="text-3xl font-bold text-indigo-900 mt-1">{event.registered_count || event.registered || 0}</p>
+                          </div>
+                          <div className="bg-teal-50 rounded-xl p-4 border border-teal-100">
+                            <p className="text-xs text-teal-600 font-semibold uppercase">Attendance</p>
+                            <p className="text-3xl font-bold text-teal-900 mt-1">{event.attendance_count || 0}</p>
+                          </div>
+                        </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-                          <p className="text-xs text-indigo-600 font-semibold uppercase">Registrations</p>
-                          <p className="text-3xl font-bold text-indigo-900 mt-1">{event.registered_count || 0}</p>
-                        </div>
-                        <div className="bg-teal-50 rounded-xl p-4 border border-teal-100">
-                          <p className="text-xs text-teal-600 font-semibold uppercase">Attendance</p>
-                          <p className="text-3xl font-bold text-teal-900 mt-1">{event.attendance_count || 0}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <div className="flex gap-3">
-                        <button
-                          onClick={async () => {
-                            try {
-                              const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/events/${event.id}/export-csv`, { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' });
-                              const url = window.URL.createObjectURL(new Blob([res.data]));
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.setAttribute('download', `${event.title.replace(/\s+/g, '_')}_attendees.csv`);
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            } catch (err) {
-                              // Fallback if API fails: try fetching participants and creating CSV manually
-                              handleViewParticipants(event.id, event.title);
-                            }
-                          }}
-                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-semibold transition"
-                        >
-                          Download Attendee List
-                        </button>
-                      </div>
-
-                      <div className="flex gap-3">
-                        <button
-                          onClick={async () => {
-                            if (!window.confirm(`Are you sure you want to ${event.is_closed ? 'open' : 'close'} registrations for this event?`)) return;
-                            try {
-                              await axios.patch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/events/${event.id}/close`, { is_closed: !event.is_closed }, { headers: { Authorization: `Bearer ${token}` } });
-                              setEvents(events.map(e => e.id === event.id ? { ...e, is_closed: !event.is_closed } : e));
-                              showAlert(`Event ${!event.is_closed ? 'closed' : 'opened'} successfully`, 'success');
-                            } catch (err) {
-                              showAlert('Failed to update event status', 'error');
-                            }
-                          }}
-                          className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${event.is_closed ? 'border-gray-300 text-gray-700 hover:bg-gray-50' : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'}`}
-                        >
-                          {event.is_closed ? 'Re-open Event' : 'Close Event'}
-                        </button>
-
-                        {event.report_url && (
-                          <a
-                            href={event.report_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex-1 text-center bg-purple-100 hover:bg-purple-200 text-purple-700 py-2 rounded-lg text-sm font-semibold transition"
+                      <div className="space-y-3">
+                        <div className="flex gap-3">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const token = localStorage.getItem('token');
+                                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/events/${event.id}/participants`, {
+                                  headers: { Authorization: `Bearer ${token}` }
+                                });
+                                const json = await res.json();
+                                if (!json.success) throw new Error(json.message);
+                                
+                                const participants = json.data || [];
+                                const csvRows = [
+                                  ['Event Title', 'Student Name', 'Email Address', 'Roll Number / UID', 'Department', 'Class/Year', 'Payment Status', 'Attendance Status', 'Registration Timestamp'],
+                                  ...participants.map(p => {
+                                    const classYear = [p.year, p.division].filter(Boolean).join(' - ');
+                                    return [
+                                      `"${(event.title || '').replace(/"/g, '""')}"`,
+                                      `"${(p.name || '').replace(/"/g, '""')}"`,
+                                      `"${(p.email || '').replace(/"/g, '""')}"`,
+                                      `"${(p.gr_number || 'N/A').replace(/"/g, '""')}"`,
+                                      `"${(p.department || 'N/A').replace(/"/g, '""')}"`,
+                                      `"${(classYear || 'N/A').replace(/"/g, '""')}"`,
+                                      `"${(p.payment_status || 'Paid').replace(/"/g, '""')}"`,
+                                      `"${(p.attendance || 'Absent').replace(/"/g, '""')}"`,
+                                      `"${p.registered_at ? new Date(p.registered_at).toLocaleString() : 'N/A'}"`
+                                    ];
+                                  })
+                                ];
+                                
+                                const csvContent = csvRows.map(e => e.join(",")).join("\n");
+                                const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement("a");
+                                link.href = url;
+                                link.setAttribute("download", `${event.title.replace(/\s+/g, '_')}_registrations.csv`);
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                URL.revokeObjectURL(url);
+                              } catch (err) {
+                                console.error('Failed to generate CSV', err);
+                                alert('Failed to generate CSV. Please try again.');
+                              }
+                            }}
+                            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2"
                           >
-                            Download Report
-                          </a>
-                        )}
+                            📥 Download CSV
+                          </button>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => {
+                              // Toggle event is_closed state locally
+                              setEvents(events.map(e => e.id === event.id ? { ...e, is_closed: !event.is_closed } : e));
+                            }}
+                            className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${event.is_closed ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'}`}
+                          >
+                            {event.is_closed ? '🔓 Re-Open Registration' : '🔒 Close Registration'}
+                          </button>
+
+                          {event.report_url && (
+                            <a
+                              href={event.report_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex-1 text-center bg-purple-100 hover:bg-purple-200 text-purple-700 py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 border border-purple-200"
+                            >
+                              📄 Download Club Report
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

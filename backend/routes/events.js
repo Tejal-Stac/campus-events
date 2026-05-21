@@ -1,5 +1,20 @@
 const express = require('express')
 const router = express.Router()
+const multer = require('multer')
+const path = require('path')
+const fs = require('fs')
+
+// Configure multer for reports
+const reportDest = path.join(__dirname, '..', 'uploads', 'reports')
+if (!fs.existsSync(reportDest)) fs.mkdirSync(reportDest, { recursive: true })
+const reportStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, reportDest),
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`
+    cb(null, unique + path.extname(file.originalname).toLowerCase())
+  }
+})
+const uploadReport = multer({ storage: reportStorage, limits: { fileSize: 20 * 1024 * 1024 } })
 const PDFDocument = require('pdfkit')
 const pool = require('../config/db')
 const auth = require('../middleware/auth')
@@ -115,29 +130,58 @@ router.get('/:id/export-csv', auth, exportEventCsv)
 router.post('/:id/register', optionalAuth, registerForEvent)
 router.get('/:id/registrations', auth, getEventRegistrations)
 
+router.post('/:eventId/upload-report', auth, isFacultyOrDeanOrClubPresident, uploadReport.single('report'), async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    
+    // Serve from static directory
+    const publicUrl = `http://localhost:5000/uploads/reports/${req.file.filename}`;
+    
+    // Update the event with the new report_url
+    const result = await pool.query(
+      'UPDATE events SET report_url = $1 WHERE id = $2 RETURNING *',
+      [publicUrl, eventId]
+    );
+    
+    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Event not found' });
+    
+    res.json({ success: true, report_url: publicUrl, data: result.rows[0] });
+  } catch (err) {
+    console.error('REPORT UPLOAD ERROR:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+})
+
 router.get('/:eventId/participants', auth, async (req, res) => {
   try {
     const { eventId } = req.params
     const result = await pool.query(
-      `SELECT u.id, u.first_name, u.last_name, u.email, u.department,
+      `SELECT e.title as event_title, u.id, u.first_name, u.last_name, u.email, u.department,
               u.division, u.year, u.gr_number, u.phone, u.college_type,
-              r.registered_at, r.status
+              r.registered_at, r.status, r.payment_status, r.attendance_marked
        FROM registrations r
        JOIN users u ON u.id = r.user_id
+       JOIN events e ON r.event_id = e.id
        WHERE r.event_id = $1
        ORDER BY u.first_name`,
       [eventId]
     )
     const participants = result.rows.map(u => ({
       id: u.id,
+      event_title: u.event_title,
       name: `${u.first_name || ''} ${u.last_name || ''}`.trim(),
       email: u.email,
       department: u.department,
       division: u.division,
       year: u.year,
+      gr_number: u.gr_number,
       phone: u.phone,
       college_type: u.college_type,
-      registered_at: u.registered_at
+      registered_at: u.registered_at,
+      status: u.status,
+      payment_status: u.payment_status,
+      attendance: u.attendance_marked ? 'Present' : 'Absent'
     }))
     res.json({ success: true, data: participants })
   } catch (err) {
