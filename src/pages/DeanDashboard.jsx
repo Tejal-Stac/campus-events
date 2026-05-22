@@ -28,6 +28,13 @@ export default function DeanDashboard() {
   const [usedCategories, setUsedCategories] = useState({});
   const [updatingFacultyId, setUpdatingFacultyId] = useState(null);
 
+  // Bulk Import state
+  const [studentFile, setStudentFile] = useState(null);
+  const [facultyFile, setFacultyFile] = useState(null);
+  const [studentImporting, setStudentImporting] = useState(false);
+  const [facultyImporting, setFacultyImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null); // { type:'success'|'error', message, errors:[] }
+
   const headers = { Authorization: `Bearer ${token}` };
 
   const showAlert = (msg, type = "success") => {
@@ -140,12 +147,68 @@ export default function DeanDashboard() {
     }
   };
 
+  // ── Bulk Import helpers ───────────────────────────────────────────────────
+  const downloadTemplate = (type) => {
+    const templates = {
+      student: {
+        content: "name,email,roll_no,department,year_of_study\nJohn Doe,john.doe@college.edu,21BCE001,Computer Engineering,2\nPriya Sharma,priya.sharma@college.edu,21ECE042,Electronics,3",
+        filename: "student_import_template.csv"
+      },
+      faculty: {
+        content: "name,email,department,designation,employee_id\nDr. Jane Smith,jane.smith@college.edu,Computer Engineering,Assistant Professor,FAC001\nProf. Rahul Mehta,rahul.mehta@college.edu,Mechanical Engineering,Associate Professor,FAC002",
+        filename: "faculty_import_template.csv"
+      }
+    };
+    const { content, filename } = templates[type];
+    const blob = new Blob([content], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = async (type) => {
+    const file = type === "student" ? studentFile : facultyFile;
+    if (!file) { showAlert("Please select a CSV file first", "error"); return; }
+    if (!file.name.endsWith(".csv")) { showAlert("Only .csv files are supported", "error"); return; }
+
+    const setLoading = type === "student" ? setStudentImporting : setFacultyImporting;
+    const endpoint = `${API}/dean/import/${type === "student" ? "students" : "faculty"}`;
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setLoading(true);
+    setImportResult(null);
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setImportResult({ type: "success", message: data.message, errors: [] });
+        showAlert(data.message, "success");
+        if (type === "student") setStudentFile(null);
+        else setFacultyFile(null);
+      } else {
+        setImportResult({ type: "error", message: data.message || "Import failed", errors: data.errors || [] });
+      }
+    } catch (err) {
+      setImportResult({ type: "error", message: "Network error — could not reach server", errors: [err.message] });
+    } finally {
+      setLoading(false);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
   const tabs = [
     { id: "overview", label: "📊 Overview" },
     { id: "departments", label: "🏛️ Departments" },
     { id: "events", label: "📅 Event Analytics" },
     { id: "faculty", label: "👨‍🏫 Faculty Management" },
     { id: "students", label: "👥 All Students" },
+    { id: "bulkImport", label: "📥 Bulk Import" },
   ];
 
   const summary = analytics?.summary || {};
@@ -157,9 +220,8 @@ export default function DeanDashboard() {
       <Navbar />
 
       {alert && (
-        <div className={`fixed top-20 right-4 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-medium ${
-          alert.type === "error" ? "bg-red-500" : "bg-green-500"
-        }`}>
+        <div className={`fixed top-20 right-4 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-medium ${alert.type === "error" ? "bg-red-500" : "bg-green-500"
+          }`}>
           {alert.msg}
         </div>
       )}
@@ -178,11 +240,10 @@ export default function DeanDashboard() {
         <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200">
           {tabs.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-3 font-semibold border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}>
+              className={`px-4 py-3 font-semibold border-b-2 transition-colors ${activeTab === tab.id
+                ? "border-indigo-600 text-indigo-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}>
               {tab.label}
             </button>
           ))}
@@ -299,10 +360,10 @@ export default function DeanDashboard() {
                         <tr className="bg-gray-50 border-b border-gray-100">
                           {["Rank", "Department", "Students", "Registrations",
                             "Participation %", "Performance"].map(h => (
-                            <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                              {h}
-                            </th>
-                          ))}
+                              <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                {h}
+                              </th>
+                            ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -594,10 +655,10 @@ export default function DeanDashboard() {
                           <tr className="bg-gray-50 border-b border-gray-100">
                             {["#", "Name", "Email", "Department",
                               "Year", "Division", "GR Number"].map(h => (
-                              <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                                {h}
-                              </th>
-                            ))}
+                                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                  {h}
+                                </th>
+                              ))}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -629,6 +690,169 @@ export default function DeanDashboard() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* BULK IMPORT TAB */}
+            {activeTab === "bulkImport" && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">Bulk Import</h2>
+                  <p className="text-sm text-gray-500 mt-1">Upload CSV files to add students or faculty in one batch. The entire import rolls back if any row fails.</p>
+                </div>
+
+                {/* Import Result Banner */}
+                {importResult && (
+                  <div className={`rounded-xl border p-4 ${importResult.type === "success"
+                    ? "bg-green-50 border-green-200"
+                    : "bg-red-50 border-red-200"
+                    }`}>
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl">{importResult.type === "success" ? "✅" : "❌"}</span>
+                      <div className="flex-1">
+                        <p className={`font-semibold text-sm ${importResult.type === "success" ? "text-green-800" : "text-red-800"
+                          }`}>{importResult.message}</p>
+                        {importResult.errors?.length > 0 && (
+                          <ul className="mt-2 space-y-1">
+                            {importResult.errors.map((e, i) => (
+                              <li key={i} className="text-xs text-red-700 font-mono bg-red-100 rounded px-2 py-1">{e}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <button onClick={() => setImportResult(null)}
+                        className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                  {/* Student Import Card */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl"></span>
+                        <div>
+                          <h3 className="font-bold text-white text-lg">Student Bulk Import</h3>
+                          <p className="text-blue-100 text-xs mt-0.5">CSV columns: name, email, roll_no, department, year_of_study</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-6 space-y-4">
+                      <div className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center hover:border-indigo-300 transition-colors">
+                        <div className="text-3xl mb-2">📂</div>
+                        <label className="cursor-pointer">
+                          <span className="text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+                            {studentFile ? studentFile.name : "Click to choose a CSV file"}
+                          </span>
+                          <input type="file" accept=".csv" className="hidden"
+                            onChange={e => { setStudentFile(e.target.files[0]); setImportResult(null); }} />
+                        </label>
+                        {studentFile && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            {(studentFile.size / 1024).toFixed(1)} KB selected
+                          </p>
+                        )}
+                        {!studentFile && <p className="text-xs text-gray-400 mt-1">Supports .csv up to 5 MB</p>}
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button onClick={() => downloadTemplate("student")}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-indigo-300 text-indigo-700 rounded-xl text-sm font-semibold hover:bg-indigo-50 transition-colors">
+                          Download Template
+                        </button>
+                        <button
+                          onClick={() => handleImport("student")}
+                          disabled={studentImporting || !studentFile}
+                          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${studentImporting || !studentFile
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                            }`}>
+                          {studentImporting ? "🔄 Processing Data..." : " Import Students"}
+                        </button>
+                      </div>
+
+                      <div className="bg-blue-50 rounded-xl p-3">
+                        <p className="text-xs font-semibold text-blue-700 mb-1"> Required Columns</p>
+                        <div className="flex flex-wrap gap-1">
+                          {["name", "email", "roll_no", "department", "year_of_study"].map(col => (
+                            <span key={col} className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-mono">{col}</span>
+                          ))}
+                        </div>
+                        <p className="text-xs text-blue-600 mt-2">Default password set to <span className="font-mono font-semibold">Student@123</span></p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Faculty Import Card */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl"></span>
+                        <div>
+                          <h3 className="font-bold text-white text-lg">Faculty Bulk Import</h3>
+                          <p className="text-emerald-100 text-xs mt-0.5">CSV columns: name, email, department, designation, employee_id</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-6 space-y-4">
+                      <div className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center hover:border-emerald-300 transition-colors">
+                        <div className="text-3xl mb-2">📂</div>
+                        <label className="cursor-pointer">
+                          <span className="text-sm font-semibold text-emerald-600 hover:text-emerald-800">
+                            {facultyFile ? facultyFile.name : "Click to choose a CSV file"}
+                          </span>
+                          <input type="file" accept=".csv" className="hidden"
+                            onChange={e => { setFacultyFile(e.target.files[0]); setImportResult(null); }} />
+                        </label>
+                        {facultyFile && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            {(facultyFile.size / 1024).toFixed(1)} KB selected
+                          </p>
+                        )}
+                        {!facultyFile && <p className="text-xs text-gray-400 mt-1">Supports .csv up to 5 MB</p>}
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button onClick={() => downloadTemplate("faculty")}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-emerald-300 text-emerald-700 rounded-xl text-sm font-semibold hover:bg-emerald-50 transition-colors">
+                          Download Template
+                        </button>
+                        <button
+                          onClick={() => handleImport("faculty")}
+                          disabled={facultyImporting || !facultyFile}
+                          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${facultyImporting || !facultyFile
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            }`}>
+                          {facultyImporting ? "🔄 Processing Data..." : " Import Faculty"}
+                        </button>
+                      </div>
+
+                      <div className="bg-emerald-50 rounded-xl p-3">
+                        <p className="text-xs font-semibold text-emerald-700 mb-1"> Required Columns</p>
+                        <div className="flex flex-wrap gap-1">
+                          {["name", "email", "department", "designation", "employee_id"].map(col => (
+                            <span key={col} className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-xs font-mono">{col}</span>
+                          ))}
+                        </div>
+                        <p className="text-xs text-emerald-600 mt-2">Default password set to <span className="font-mono font-semibold">Faculty@123</span></p>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Info Banner */}
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+                  <span className="text-xl">⚠️</span>
+                  <div className="text-xs text-amber-800 space-y-1">
+                    <p className="font-semibold">Transaction Safety</p>
+                    <p>If <strong>any row</strong> in your CSV contains a duplicate email or roll number, the <strong>entire batch is rolled back</strong> — no partial records are inserted. Fix the highlighted error and re-upload.</p>
+                    <p>Ensure your CSV uses <strong>UTF-8 encoding</strong> and the first row is the exact header row from the template.</p>
+                  </div>
+                </div>
               </div>
             )}
           </>

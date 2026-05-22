@@ -2,6 +2,11 @@ const express = require('express')
 const router = express.Router()
 const pool = require('../config/db')
 const auth = require('../middleware/auth')
+const multer = require('multer')
+const path = require('path')
+const fs = require('fs')
+const xlsx = require('xlsx')
+const bcrypt = require('bcryptjs')
 
 const isDean = (req, res, next) => {
   if (req.user.role !== 'dean' && req.user.role !== 'admin') {
@@ -265,6 +270,152 @@ router.put('/faculties/:id/coordinator', auth, isDean, async (req, res) => {
   } catch (err) {
     console.error('UPDATE COORDINATOR ERROR:', err.message)
     res.status(500).json({ success: false, message: 'Server error', error: err.message })
+  }
+})
+
+// ── CSV Bulk Import ────────────────────────────────────────────────────────
+const csvStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'uploads')
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    cb(null, dir)
+  },
+  filename: (req, file, cb) => cb(null, `import_${Date.now()}.csv`)
+})
+const csvUpload = multer({
+  storage: csvStorage,
+  fileFilter: (req, file, cb) => {
+    if (path.extname(file.originalname).toLowerCase() === '.csv') cb(null, true)
+    else cb(new Error('Only .csv files are accepted'), false)
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }
+})
+
+// POST /api/dean/import/students
+router.post('/import/students', auth, isDean, csvUpload.single('file'), async (req, res) => {
+  const client = await pool.connect()
+  let currentLine = 1
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No CSV file uploaded' })
+
+    const workbook = xlsx.readFile(req.file.path)
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' })
+
+    if (rows.length === 0)
+      return res.status(400).json({ success: false, message: 'CSV file has no data rows' })
+
+    await client.query('BEGIN')
+
+    for (let i = 0; i < rows.length; i++) {
+      currentLine = i + 2
+      const row = rows[i]
+      const name       = String(row.name || '').trim()
+      const email      = String(row.email || '').trim().toLowerCase()
+      const roll_no    = String(row.roll_no || '').trim()
+      const department = String(row.department || '').trim()
+      const year       = parseInt(row.year_of_study) || null
+
+      if (!name || !email)
+        throw Object.assign(new Error(`Line ${currentLine}: Missing required fields — "name" and "email" are required`), { userFacing: true })
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        throw Object.assign(new Error(`Line ${currentLine}: Invalid email format — "${email}"`), { userFacing: true })
+
+      const parts     = name.split(' ')
+      const firstName = parts[0]
+      const lastName  = parts.slice(1).join(' ') || ''
+      const hashedPwd = await bcrypt.hash('Student@123', 10)
+
+      await client.query(
+        `INSERT INTO users (first_name, last_name, email, password, role, department, gr_number, year)
+         VALUES ($1,$2,$3,$4,'student',$5,$6,$7)`,
+        [firstName, lastName, email, hashedPwd, department || null, roll_no || null, year]
+      )
+    }
+
+    await client.query('COMMIT')
+    res.json({ success: true, message: `Successfully imported ${rows.length} student(s)`, imported: rows.length })
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    let msg = err.message
+    if (err.code === '23505') {
+      if ((err.constraint || '').includes('email'))
+        msg = `Line ${currentLine}: Email already exists — ${err.detail || ''}`
+      else if ((err.constraint || '').includes('gr_number'))
+        msg = `Line ${currentLine}: Roll Number already exists — ${err.detail || ''}`
+      else
+        msg = `Line ${currentLine}: Duplicate entry — ${err.detail || err.message}`
+    } else if (!err.userFacing) {
+      msg = `Line ${currentLine}: DB error — ${err.message}`
+    }
+    console.error('BULK IMPORT STUDENTS ERROR:', err.message)
+    res.status(409).json({ success: false, message: 'Import failed — batch rolled back', errors: [msg] })
+  } finally {
+    client.release()
+    if (req.file?.path) try { fs.unlinkSync(req.file.path) } catch {}
+  }
+})
+
+// POST /api/dean/import/faculty
+router.post('/import/faculty', auth, isDean, csvUpload.single('file'), async (req, res) => {
+  const client = await pool.connect()
+  let currentLine = 1
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No CSV file uploaded' })
+
+    const workbook = xlsx.readFile(req.file.path)
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' })
+
+    if (rows.length === 0)
+      return res.status(400).json({ success: false, message: 'CSV file has no data rows' })
+
+    await client.query('BEGIN')
+
+    for (let i = 0; i < rows.length; i++) {
+      currentLine = i + 2
+      const row = rows[i]
+      const name        = String(row.name || '').trim()
+      const email       = String(row.email || '').trim().toLowerCase()
+      const department  = String(row.department || '').trim()
+      const designation = String(row.designation || '').trim()
+      const employee_id = String(row.employee_id || '').trim()
+
+      if (!name || !email)
+        throw Object.assign(new Error(`Line ${currentLine}: Missing required fields — "name" and "email" are required`), { userFacing: true })
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        throw Object.assign(new Error(`Line ${currentLine}: Invalid email format — "${email}"`), { userFacing: true })
+
+      const parts     = name.split(' ')
+      const firstName = parts[0]
+      const lastName  = parts.slice(1).join(' ') || ''
+      const hashedPwd = await bcrypt.hash('Faculty@123', 10)
+
+      await client.query(
+        `INSERT INTO users (first_name, last_name, email, password, role, department, designation, gr_number)
+         VALUES ($1,$2,$3,$4,'faculty',$5,$6,$7)`,
+        [firstName, lastName, email, hashedPwd, department || null, designation || null, employee_id || null]
+      )
+    }
+
+    await client.query('COMMIT')
+    res.json({ success: true, message: `Successfully imported ${rows.length} faculty member(s)`, imported: rows.length })
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    let msg = err.message
+    if (err.code === '23505') {
+      if ((err.constraint || '').includes('email'))
+        msg = `Line ${currentLine}: Email already exists — ${err.detail || ''}`
+      else
+        msg = `Line ${currentLine}: Duplicate entry — ${err.detail || err.message}`
+    } else if (!err.userFacing) {
+      msg = `Line ${currentLine}: DB error — ${err.message}`
+    }
+    console.error('BULK IMPORT FACULTY ERROR:', err.message)
+    res.status(409).json({ success: false, message: 'Import failed — batch rolled back', errors: [msg] })
+  } finally {
+    client.release()
+    if (req.file?.path) try { fs.unlinkSync(req.file.path) } catch {}
   }
 })
 
