@@ -653,7 +653,8 @@ This project is licensed under the MIT License.
 ## 👥 Authors
 
 - **Tejal Jadhav** - Initial work - [Tejal-Stac](https://github.com/Tejal-Stac)
-
+- **Siddhivinayak Patil** - Ideation and functionality management  - [HighSiddhu56964](https://github.com/HighSiddhu56964)
+- **Vedant Patkar**
 ---
 
 ## 🙏 Acknowledgments
