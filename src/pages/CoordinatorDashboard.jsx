@@ -3,10 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import EventCard from '../components/EventCard'
-import axios from 'axios'
+import api from '../api/axiosConfig'
 import { X, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 export default function CoordinatorDashboard() {
   const { user, token } = useAuth()
@@ -44,11 +42,9 @@ export default function CoordinatorDashboard() {
         
         // [FIX] Now fetches all three statuses (pending, approved, rejected) in one call
         console.log('COORD_DEBUG: Fetching events for category:', user?.coordinator_type)
-        const url = `${API}/events/coordinator/pending-events`
+        const url = '/events/coordinator/pending-events'
         console.log('COORD_DEBUG: Fetching from:', url)
-        const res = await axios.get(url, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const res = await api.get(url)
         console.log('COORD_DEBUG: Events response:', res.data)
         
         const allEvents = res.data.data || []
@@ -94,10 +90,9 @@ export default function CoordinatorDashboard() {
 
   const handleApproveEvent = async (eventId) => {
     try {
-      const res = await axios.put(
-        `${API}/events/${eventId}/approve`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await api.put(
+        `/events/${eventId}/approve`,
+        {}
       )
       showAlert('✅ Event approved successfully!', 'success')
       setPendingEvents(pendingEvents.filter(e => e.id !== eventId))
@@ -122,10 +117,9 @@ export default function CoordinatorDashboard() {
 
     try {
       setRejectingInProgress(true)
-      const res = await axios.put(
-        `${API}/events/${eventId}/reject`,
-        { coordinator_remarks: rejectRemark },
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await api.put(
+        `/events/${eventId}/reject`,
+        { coordinator_remarks: rejectRemark }
       )
       showAlert('❌ Event rejected with remarks sent to faculty', 'success')
       setPendingEvents(pendingEvents.filter(e => e.id !== eventId))

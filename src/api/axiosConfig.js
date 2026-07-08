@@ -1,8 +1,17 @@
 import axios from 'axios';
 
+// Fallback configuration for development
+const baseEnvUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+// Ensures that the production URL always ends with '/api' cleanly,
+// regardless of whether the Vercel variable has a trailing slash or missing suffix.
+const cleanBaseURL = baseEnvUrl.endsWith('/api')
+  ? baseEnvUrl
+  : `${baseEnvUrl.replace(/\/$/, '')}/api`;
+
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: cleanBaseURL,
   headers: {
     'Content-Type': 'application/json',
   },

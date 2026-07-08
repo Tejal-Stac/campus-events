@@ -1,15 +1,11 @@
-import axios from 'axios'
-
-const API = 'http://localhost:5000'
-
-const getToken = () => localStorage.getItem('token')
-const headers = () => ({ Authorization: `Bearer ${getToken()}` })
+import api from '../api/api';
 
 // ── Analytics Endpoints ──
 
 export const fetchHodAnalytics = async () => {
   try {
-    const res = await axios.get(`${API}/api/hod/analytics`, { headers: headers() })
+    // Uses 'api' custom instance; base URL and Auth headers are added automatically!
+    const res = await api.get('/hod/analytics')
     return res.data
   } catch (error) {
     console.error('Error fetching HOD analytics:', error.message)
@@ -21,7 +17,7 @@ export const fetchHodAnalytics = async () => {
 
 export const fetchHodStudents = async () => {
   try {
-    const res = await axios.get(`${API}/api/hod/students`, { headers: headers() })
+    const res = await api.get('/hod/students')
     return res.data
   } catch (error) {
     console.error('Error fetching HOD students:', error.message)
@@ -34,9 +30,9 @@ export const fetchHodStudents = async () => {
 export const fetchHodEvents = async (department = null) => {
   try {
     const url = department && department !== 'All'
-      ? `${API}/api/hod/events?department=${encodeURIComponent(department)}`
-      : `${API}/api/hod/events`
-    const res = await axios.get(url, { headers: headers() })
+      ? `/hod/events?department=${encodeURIComponent(department)}`
+      : '/hod/events'
+    const res = await api.get(url)
     return res.data
   } catch (error) {
     console.error('Error fetching HOD events:', error.message)
@@ -52,7 +48,7 @@ export const fetchHodEvents = async (department = null) => {
  */
 export const fetchEventStats = async (eventId) => {
   try {
-    const res = await axios.get(`${API}/api/hod/event/${eventId}/stats`, { headers: headers() })
+    const res = await api.get(`/hod/event/${eventId}/stats`)
     return res.data
   } catch (error) {
     console.error('Error fetching event stats:', error.message)
@@ -66,7 +62,7 @@ export const fetchEventStats = async (eventId) => {
  */
 export const fetchEventStudentList = async (eventId) => {
   try {
-    const res = await axios.get(`${API}/api/hod/event/${eventId}/students`, { headers: headers() })
+    const res = await api.get(`/hod/event/${eventId}/students`)
     return res.data
   } catch (error) {
     console.error('Error fetching event student list:', error.message)

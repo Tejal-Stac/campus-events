@@ -5,7 +5,7 @@ import eventService from "../api/eventService";
 import Navbar from "../components/Navbar";
 import EventCard from "../components/EventCard";
 import { Users, Mail, Phone, Calendar, X, AlertCircle } from "lucide-react";
-import axios from "axios";
+import api from '../api/axiosConfig';
 
 const EVENT_TYPE_STYLES = {
   National:     "bg-red-100 text-red-700 border-red-200",
@@ -657,11 +657,8 @@ export default function FacultyDashboard() {
                           <button
                             onClick={async () => {
                               try {
-                                const token = localStorage.getItem('token');
-                                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/events/${event.id}/participants`, {
-                                  headers: { Authorization: `Bearer ${token}` }
-                                });
-                                const json = await res.json();
+                                const res = await api.get(`/events/${event.id}/participants`);
+                                const json = res.data;
                                 if (!json.success) throw new Error(json.message);
                                 
                                 const participants = json.data || [];
