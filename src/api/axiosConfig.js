@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Fallback configuration for development
-const baseEnvUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const baseEnvUrl = import.meta.env.VITE_API_URL || 'https://campus-events-ebwx.onrender.com/api';
 
 // Ensures that the production URL always ends with '/api' cleanly,
 // regardless of whether the Vercel variable has a trailing slash or missing suffix.
