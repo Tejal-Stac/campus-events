@@ -69,6 +69,19 @@ export default function DeanDashboard() {
     } finally {
       setLoading(false);
     }
+
+    const fetchAnalytics = async () => {
+      // 👇 ADD THESE TWO LINES HERE
+      console.log("🔴 CURRENT BACKEND BASEURL:", api.defaults.baseURL);
+      console.log("🔴 RAW VITE ENV VARIABLE:", import.meta.env.VITE_API_URL);
+
+      try {
+        const res = await api.get('/dean/analytics');
+        setAnalytics(res.data.data);
+      } catch (err) {
+        // ...
+      }
+    };
   };
 
   const fetchPendingEvents = async () => {
