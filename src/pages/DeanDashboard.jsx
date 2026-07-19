@@ -2,8 +2,25 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
-import api from "../api/axiosConfig";
+// import api from "../api/axiosConfig";
 import { eventService } from "../api/eventService";
+import axios from 'axios';
+
+// 1. Paste your raw Render link right here (Make sure it ends with /api)
+const PRODUCTION_BACKEND_URL = 'https://YOUR-BACKEND-NAME.onrender.com/api';
+
+// 2. Create a completely isolated instance inside this file only
+const isolatedApi = axios.create({
+  baseURL: PRODUCTION_BACKEND_URL,
+  headers: { 'Content-Type': 'application/json' }
+});
+
+// 3. Attach the token directly
+isolatedApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
 const DEPT_COLORS = [
   "#6366f1", "#10b981", "#f59e0b", "#ef4444",
@@ -62,26 +79,15 @@ export default function DeanDashboard() {
 
   const fetchAnalytics = async () => {
     try {
-      const res = await api.get('/dean/analytics');
+      setLoading(true);
+      // Use the completely isolated api instance here
+      const res = await isolatedApi.get('/dean/analytics');
       setAnalytics(res.data.data);
     } catch (err) {
-      showAlert(err.response?.data?.message || "Failed to load analytics", "error");
+      console.error(err);
     } finally {
       setLoading(false);
     }
-
-    const fetchAnalytics = async () => {
-      // 👇 ADD THESE TWO LINES HERE
-      console.log("🔴 CURRENT BACKEND BASEURL:", api.defaults.baseURL);
-      console.log("🔴 RAW VITE ENV VARIABLE:", import.meta.env.VITE_API_URL);
-
-      try {
-        const res = await api.get('/dean/analytics');
-        setAnalytics(res.data.data);
-      } catch (err) {
-        // ...
-      }
-    };
   };
 
   const fetchPendingEvents = async () => {
@@ -124,7 +130,7 @@ export default function DeanDashboard() {
       const url = deptFilter === "all"
         ? '/dean/students'
         : `/dean/students?department=${deptFilter}`;
-      const res = await api.get(url);
+      const res = await isolatedApi.get('/dean/students');
       setStudents(res.data.data || []);
     } catch (err) {
       console.error("Students fetch failed:", err.message);
@@ -133,7 +139,7 @@ export default function DeanDashboard() {
 
   const fetchFaculties = async () => {
     try {
-      const res = await api.get('/dean/faculties');
+      const res = await isolatedApi.get('/dean/faculties');
       setFaculties(res.data.data || []);
       setUsedCategories(res.data.usedCategories || {});
     } catch (err) {
