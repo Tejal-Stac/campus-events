@@ -7,7 +7,7 @@ import { eventService } from "../api/eventService";
 import axios from 'axios';
 
 // 1. Paste your raw Render link right here (Make sure it ends with /api)
-const PRODUCTION_BACKEND_URL = 'https://YOUR-BACKEND-NAME.onrender.com/api';
+const PRODUCTION_BACKEND_URL = 'https://campus-events-ebwx.onrender.com/api';
 
 // 2. Create a completely isolated instance inside this file only
 const isolatedApi = axios.create({
