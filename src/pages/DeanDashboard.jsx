@@ -2,10 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
-import axios from "axios";
+import api from "../api/axiosConfig";
 import { eventService } from "../api/eventService";
-
-const API = "http://localhost:5000/api";
 
 const DEPT_COLORS = [
   "#6366f1", "#10b981", "#f59e0b", "#ef4444",
@@ -16,7 +14,7 @@ const DEPT_COLORS = [
 export default function DeanDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+
 
   const [activeTab, setActiveTab] = useState("overview");
   const [analytics, setAnalytics] = useState(null);
@@ -35,7 +33,7 @@ export default function DeanDashboard() {
   const [facultyImporting, setFacultyImporting] = useState(false);
   const [importResult, setImportResult] = useState(null); // { type:'success'|'error', message, errors:[] }
 
-  const headers = { Authorization: `Bearer ${token}` };
+
 
   const showAlert = (msg, type = "success") => {
     setAlert({ msg, type });
@@ -64,7 +62,7 @@ export default function DeanDashboard() {
 
   const fetchAnalytics = async () => {
     try {
-      const res = await axios.get(`${API}/dean/analytics`, { headers });
+      const res = await api.get('/dean/analytics');
       setAnalytics(res.data.data);
     } catch (err) {
       showAlert(err.response?.data?.message || "Failed to load analytics", "error");
@@ -111,9 +109,9 @@ export default function DeanDashboard() {
   const fetchStudents = async () => {
     try {
       const url = deptFilter === "all"
-        ? `${API}/dean/students`
-        : `${API}/dean/students?department=${deptFilter}`;
-      const res = await axios.get(url, { headers });
+        ? '/dean/students'
+        : `/dean/students?department=${deptFilter}`;
+      const res = await api.get(url);
       setStudents(res.data.data || []);
     } catch (err) {
       console.error("Students fetch failed:", err.message);
@@ -122,7 +120,7 @@ export default function DeanDashboard() {
 
   const fetchFaculties = async () => {
     try {
-      const res = await axios.get(`${API}/dean/faculties`, { headers });
+      const res = await api.get('/dean/faculties');
       setFaculties(res.data.data || []);
       setUsedCategories(res.data.usedCategories || {});
     } catch (err) {
@@ -133,10 +131,9 @@ export default function DeanDashboard() {
   const updateFacultyCoordinator = async (facultyId, newType) => {
     setUpdatingFacultyId(facultyId);
     try {
-      const res = await axios.put(
-        `${API}/dean/faculties/${facultyId}/coordinator`,
-        { coordinatorType: newType },
-        { headers }
+      const res = await api.put(
+        `/dean/faculties/${facultyId}/coordinator`,
+        { coordinatorType: newType }
       );
       showAlert(res.data.message, "success");
       fetchFaculties();
@@ -173,20 +170,18 @@ export default function DeanDashboard() {
     if (!file.name.endsWith(".csv")) { showAlert("Only .csv files are supported", "error"); return; }
 
     const setLoading = type === "student" ? setStudentImporting : setFacultyImporting;
-    const endpoint = `${API}/dean/import/${type === "student" ? "students" : "faculty"}`;
+    const endpoint = `/dean/import/${type === "student" ? "students" : "faculty"}`;
     const formData = new FormData();
     formData.append("file", file);
 
     setLoading(true);
     setImportResult(null);
     try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData
+      const res = await api.post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = res.data;
+      if (data.success) {
         setImportResult({ type: "success", message: data.message, errors: [] });
         showAlert(data.message, "success");
         if (type === "student") setStudentFile(null);

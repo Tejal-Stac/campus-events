@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import authService from '../api/authService'
+import api from '../api/axiosConfig'
 
 const AuthContext = createContext(null)
 
@@ -55,15 +56,10 @@ export const AuthProvider = ({ children }) => {
   }
 
   const register = async (userData) => {
-    const response = await fetch('http://localhost:5000/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
-    })
+    const response = await api.post('/auth/register', userData)
+    const data = response.data
 
-    const data = await response.json()
-
-    if (!response.ok) {
+    if (!data.user && !data.success) {
       throw new Error(data.message || 'Registration failed')
     }
 

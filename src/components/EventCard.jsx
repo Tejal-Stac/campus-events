@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { getEventStatus } from '../utils/eventHelpers'
+import api from '../api/axiosConfig'
 
 /**
  * Universal EventCard Component
@@ -407,18 +408,11 @@ export default function EventCard({ event, role, onAction, isRegistered = false,
                     formData.append('report', file);
                     formData.append('eventId', event.id);
 
-                    const token = localStorage.getItem('token');
-                    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/events/${event.id}/upload-report`, {
-                      method: 'POST',
-                      headers: { Authorization: `Bearer ${token}` },
-                      body: formData
+                    const response = await api.post(`/events/${event.id}/upload-report`, formData, {
+                      headers: { 'Content-Type': 'multipart/form-data' }
                     });
 
-                    if (!response.ok) {
-                      throw new Error('Upload failed');
-                    }
-
-                    const data = await response.json();
+                    const data = response.data;
                     
                     setUploadedUrl(data.report_url);
                     setUploadStatus('success');

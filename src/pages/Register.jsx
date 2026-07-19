@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
+import api from '../api/axiosConfig'
 
 const DEPARTMENTS = [
   'Computer Engineering',
@@ -93,14 +94,8 @@ export default function Register() {
         hod_department: form.hodDepartment || undefined,
       }
 
-      const res = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      const data = await res.json()
-
-      if (!res.ok) { setError(data.message || 'Registration failed'); return }
+      const res = await api.post('/auth/register', payload)
+      const data = res.data
 
       if (data.pending) {
         setSuccess('Registration submitted! Awaiting coordinator approval.')
@@ -111,7 +106,7 @@ export default function Register() {
       setTimeout(() => navigate('/login'), 1500)
 
     } catch (err) {
-      setError('Cannot connect to server. Make sure backend is running.')
+      setError(err.response?.data?.message || 'Cannot connect to server.')
     } finally {
       setLoading(false)
     }

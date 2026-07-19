@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import axios from 'axios'
-
-const API = 'http://localhost:5000'
+import api from '../api/axiosConfig'
 
 export default function Profile() {
   const { user: authUser, logout } = useAuth()
@@ -13,15 +11,13 @@ export default function Profile() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
-  const getToken = () => localStorage.getItem('token')
+
 
   useEffect(() => { fetchProfile() }, [])
 
   const fetchProfile = async () => {
     try {
-      const res = await axios.get(`${API}/api/users/profile`, {
-        headers: { Authorization: `Bearer ${getToken()}` }
-      })
+      const res = await api.get('/users/profile')
       const data = res.data.data || res.data
       // ✅ Fix: parse interests if it's a string
       if (data.interests && typeof data.interests === 'string') {
@@ -285,7 +281,7 @@ export default function Profile() {
                 onClick={async () => {
                   setSaving(true); setMsg('')
                   try {
-                    await axios.put(`${API}/api/users/${p.id}`, {
+                    await api.put(`/users/${p.id}`, {
                       first_name: editForm.firstName,
                       last_name: editForm.lastName,
                       phone: editForm.phone,
@@ -293,8 +289,6 @@ export default function Profile() {
                       year: editForm.year,
                       bio: editForm.bio,
                       interests: Array.isArray(editForm.interests) ? editForm.interests : []
-                    }, {
-                      headers: { Authorization: `Bearer ${getToken()}` }
                     })
                     setMsg('✅ Profile updated successfully!')
                     fetchProfile()

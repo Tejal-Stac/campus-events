@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import axios from 'axios'
+import api from '../api/axiosConfig'
 import * as HodService from '../api/hodService'
-
-const API = 'http://localhost:5000'
 
 // ── Recharts (loaded via CDN in index.html, or import if installed)
 // import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
@@ -65,8 +63,7 @@ export default function HodDashboard() {
     }
   }, [activeTab])
 
-  const getToken = () => localStorage.getItem('token')
-  const headers = () => ({ Authorization: `Bearer ${getToken()}` })
+
 
   const fetchAll = async () => {
     setLoading(true)
@@ -86,11 +83,7 @@ export default function HodDashboard() {
 
   const fetchFaculties = async () => {
     try {
-      const API = 'http://localhost:5000/api'
-      const token = getToken()
-      const res = await axios.get(`${API}/users/departmental/faculty`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const res = await api.get('/users/departmental/faculty')
       setFaculties(res.data.data || [])
     } catch (e) { console.error('Faculties fetch error:', e.message) }
   }

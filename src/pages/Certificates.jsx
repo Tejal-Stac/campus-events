@@ -1,5 +1,6 @@
 import Navbar from '../components/Navbar'
 import { useState, useEffect } from 'react'
+import api from '../api/axiosConfig'
 
 function CertificatePreview({ cert, onClose, onDownload, downloading }) {
   return (
@@ -87,10 +88,8 @@ export default function Certificates() {
       return
     }
     try {
-      const response = await fetch('http://localhost:5000/api/events', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const events = await response.json()
+      const response = await api.get('/events')
+      const events = Array.isArray(response.data) ? response.data : []
       const approved = events.filter(e => e.status === 'approved')
       setRegisteredEvents(approved)
     } catch (err) {
@@ -106,18 +105,11 @@ export default function Certificates() {
     }
     setDownloading(true)
     try {
-      const response = await fetch(`http://localhost:5000/api/certificates/generate/${eventId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const response = await api.get(`/certificates/generate/${eventId}`, {
+        responseType: 'blob'
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        alert(data.message || 'Could not generate certificate')
-        setDownloading(false)
-        return
-      }
-
-      const blob = await response.blob()
+      const blob = response.data
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -127,7 +119,8 @@ export default function Certificates() {
       a.remove()
       window.URL.revokeObjectURL(url)
     } catch (err) {
-      alert('Download failed! Make sure backend is running.')
+      const msg = err.response?.data?.message || 'Could not generate certificate'
+      alert(msg)
     }
     setDownloading(false)
   }
