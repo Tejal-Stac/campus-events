@@ -1,677 +1,184 @@
-# 🎓 Campus Event Management System
+# Campus Events Platform
 
-A comprehensive, multi-role event management platform designed for educational institutions. Built with modern web technologies to streamline event organization, registration, and participation tracking.
+A centralized, role-based web application designed to digitize, track, and audit the complete lifecycle of university club activities, technical fests, and departmental events.
 
-## 🌟 Project Overview
+## Executive Summary and Problem Statement
 
-The **Campus Event Management System** empowers educational institutions to manage events across multiple stakeholder roles:
+In traditional academic institutions, organizing and auditing campus events often relies on fragmented social media channels, unmanaged spreadsheets, and physical paper sign-offs. This results in poor event visibility for students, tedious registration tracking for clubs, and administrative overhead for faculty and deans.
 
-- **Students**: Browse events, register, track participation points, manage profile
-- **Faculty**: Oversee events, review student participation, manage academic activities
-- **Dean/Admin**: Approve events, assign roles, monitor campus-wide activities
-- **Coordinator/Club Head**: Create and manage events, track registrations, coordinate logistics
+The Campus Events Platform unifies students, club leaders, faculty coordinators, department heads, and institutional administrators into a single, decoupled client-server network:
 
-### 🎯 Key Features
+* Students discover events, register with one click, earn skill points, and access unified schedules.
+* Club Presidents manage event creation, track attendee counts, and submit event reports.
+* HODs and Faculty review proposed events, control registration gates, and export clean registration manifests.
+* Deans and Admins oversee institutional analytics, assign user roles, and onboard accounts in bulk via CSV parsers.
 
-#### 🔐 Authentication & Authorization
-- **Secure JWT-based authentication** with role-based access control (RBAC)
-- **Multi-role dashboards** with personalized navigation and features
-- **Global AuthContext** for real-time user state synchronization
-- **Automatic role-based redirects** to prevent unauthorized access
-
-#### 📅 Live Event Dashboard
-- **Dynamic event cards** with hero images, gradient overlays, and glassmorphism badges
-- **Real-time capacity tracking** with visual progress bars
-- **Category-based filtering** (Hackathons, Seminars, Workshops, Cultural, Sports)
-- **Smart registration buttons** that update to "Already Registered" with visual feedback
-- **Persistent registration state** synchronized with PostgreSQL database
-
-#### 👤 Profile Management
-- **Editable user profiles** with instant database updates
-- **Real-time navbar synchronization** using refreshUser() in AuthContext
-- **Profile fields**: Name, Email, Phone, Branch, Year, Bio, Interests, Skills, Social Links
-- **Points tracking** visible across all pages after event participation
-
-#### 🎭 Event Registration System
-- **Transaction-based duplicate prevention** at database level
-- **Atomic operations**: Registration + Points Award (100 points per event)
-- **Frontend validation**: Disabled buttons for fully booked or already registered events
-- **Background data refresh** to keep UI synchronized after registration
-
-#### 🛡️ Role-Based Security
-- **useEffect-based protection** in all dashboard components
-- **Automatic redirects** based on user role from database
-- **Navigation guards** using react-router's ProtectedRoute component
-- **Replace navigation** to prevent back-button security bypass
-
-#### 🎨 Modern UI/UX
-- **Tailwind CSS** for responsive, mobile-friendly design
-- **Hero images** with gradient overlays and smooth hover animations
-- **Glassmorphism effects** for badges and status indicators
-- **Visual feedback** for all user interactions (loading states, success alerts)
-- **Consistent design language** across all dashboard variants
-
----
-
-## 🛠️ Core Tech Stack
+## Technology Stack
 
 ### Frontend
-- **React 18** - Modern UI library with hooks
-- **Vite** - Lightning-fast build tool and dev server
-- **React Router v6** - Client-side routing with protected routes
-- **Axios** - Centralized HTTP client with JWT interceptors
-- **Tailwind CSS** - Utility-first styling framework
-- **Context API** - Global state management (AuthContext)
+
+* React.js (v18): Component-based UI library compiled with Vite
+* Tailwind CSS: Utility-first CSS framework for responsive design
+* React Router DOM (v6): Client-side routing with custom RBAC security guards
+* Axios: HTTP client for REST API communication
 
 ### Backend
-- **Node.js** - JavaScript runtime
-- **Express.js** - RESTful API framework
-- **PostgreSQL (Local)** - Relational database system
-- **JWT** - Stateless authentication tokens
-- **bcryptjs** - Password hashing
-- **CORS** - Cross-origin resource sharing
+
+* Node.js and Express.js: Server-side execution environment and RESTful routing layer
+* Multer: Middleware handling FormData multi-part file uploads
+* JSON Web Tokens (JWT): Token-based authentication and authorization
+* bcryptjs: Cryptographic hashing for secure user passwords
 
 ### Database
-- **PostgreSQL** - Local or cloud-hosted PostgreSQL database
-- **Transaction support** for atomic operations
-- **Indexed queries** for optimal performance
 
----
+* PostgreSQL: Relational database engine with foreign keys and ACID compliance
+* pg (node-postgres): Connection pool driver for high-throughput SQL queries
 
-## 📦 Installation Guide
+## System Features by User Role
+
+### 1. Student Portal
+
+* Live Discovery Feed: Filter public events into Live, Upcoming, or Past categories.
+* One-Click Registration: Instant registration trigger that awards 100 skill points upon completion.
+* Profile Management: Update personal details, contact info, bio, and track accumulated points in real time.
+* Non-VIT Participation: Native registration support for outside college students during intercollegiate events.
+
+### 2. Club President Portal
+
+* Event Creation Interface: Form wizard to publish new departmental, intercollegiate, or national events.
+* Document Persistence Engine: Upload official event reports (.pdf, .odf, .doc, .docx) directly to local server storage.
+* State Persistence: Persistent Report Uploaded state pinned across page reloads once stored in the database.
+
+### 3. Head of Department (HOD) Portal
+
+* Departmental Gatekeeping: Review event proposals submitted by student clubs.
+* Approval Workflow: Approve events to make them live on the public feed or reject them with mandatory feedback notes.
+
+### 4. Faculty Coordinator Hub
+
+* Registration Controls: Real-time toggles to flip event states between Open and Closed.
+* Audit Center: View and download official event completion reports uploaded by student clubs.
+* Native CSV Export Engine: Client-side JavaScript serialization loop that compiles raw database JSON matrices into dual-quoted CSV spreadsheets for clean Excel integration.
+
+### 5. On-Ground Volunteer Interface
+
+* Mobile-Responsive Checklist: Attendance sheet for event volunteers to mark student status as Present during live events.
+
+### 6. Dean and Admin Dashboard
+
+* System Analytics: High-level metrics on total events, student involvement, and departmental engagement.
+* Role Assignment Panel: Grant or revoke user permissions for Club President, Faculty Coordinator, or HOD roles.
+* Bulk Import Engine: Batch process mass CSV files (students.csv and faculty.csv) within wrapped PostgreSQL transaction blocks (BEGIN to COMMIT), ensuring automated ROLLBACK triggers if unique constraint violations occur.
+
+## Architecture and Diagrams
+
+The system follows a decoupled, local client-server architecture designed to operate seamlessly on local university networks.
+
+All architecture diagrams, sequence visuals, and system flowcharts can be viewed at: [https://drive.google.com/drive/folders/1cWes0fhABLcNT7-VBAFcK1fTAbVhKOav?usp=sharing](https://drive.google.com/drive/folders/1cWes0fhABLcNT7-VBAFcK1fTAbVhKOav?usp=sharing)
+
+## Repository Directory Structure
+
+campus-events-platform/
+├── backend/
+│   ├── config/
+│   │   └── db.js                 # PostgreSQL connection pool setup
+│   ├── controllers/
+│   │   ├── authController.js     # User registration, login, and JWT generation
+│   │   ├── eventController.js    # Event CRUD, registration logic, and status toggles
+│   │   ├── deanController.js     # Bulk import parsers and system analytics
+│   │   └── hodController.js      # Departmental event approval logic
+│   ├── middleware/
+│   │   ├── authMiddleware.js     # JWT verification and RBAC role checks
+│   │   └── uploadMiddleware.js   # Multer local storage configuration
+│   ├── uploads/
+│   │   └── reports/              # Static local storage disk for event PDFs
+│   ├── routes/                   # Express REST API endpoint definitions
+│   ├── .env.example              # Sample environment configuration file
+│   └── server.js                 # Main Express server entry point
+├── frontend/
+│   ├── src/
+│   │   ├── components/           # Navbar, EventCard, ProtectedRoute
+│   │   ├── context/              # AuthContext global state management
+│   │   ├── pages/                # Student, Faculty, Club, HOD, and Dean Dashboards
+│   │   ├── App.jsx               # React Router configuration tree
+│   │   └── main.jsx              # Vite entry point
+│   ├── index.html
+│   ├── tailwind.config.js
+│   └── vite.config.js
+└── schema.sql                    # Core PostgreSQL database schema
+
+## Getting Started (Local Setup Guide)
 
 ### Prerequisites
-- **Node.js** v16 or higher ([Download](https://nodejs.org/))
-- **npm** (comes with Node.js) or **yarn**
-- **PostgreSQL** installed locally ([Download](https://www.postgresql.org/download/))
-- **Git** for version control
 
-### 1️⃣ Clone the Repository
+Make sure you have the following software installed locally:
 
-```bash
-git clone https://github.com/Tejal-Stac/campus-events.git
-cd campus-events
-```
+* Node.js (v18.0.0 or higher)
+* npm (v9.0.0 or higher)
+* PostgreSQL Server (v14 or higher)
 
-### 2️⃣ Backend Setup
 
-```bash
-# Navigate to backend directory
+### Step 1: Database Setup
+
+1. Open PostgreSQL (via pgAdmin or terminal) and create a fresh database:
+      CREATE DATABASE campus_events_db;
+
+
+
+2. Import the schema script to initialize all tables, constraints, and indexes:
+      psql -U postgres -d campus_events_db -f schema.sql
+
+
+### Step 2: Backend Configuration and Execution
+
+1. Navigate to the backend directory and install dependencies:
+
 cd backend
-
-# Install dependencies
 npm install
 
-# Create environment variables file
-cp .env.example .env
+2. Create a .env file in the root of the backend folder and populate it:
 
-# Edit .env with your database credentials (see Database Setup below)
-notepad .env  # Windows
-nano .env     # Linux/Mac
-```
-
-### 3️⃣ Frontend Setup
-
-```bash
-# Navigate to project root
-cd ..
-
-# Install dependencies
-npm install
-```
-
----
-
-## 🗄️ Database Setup
-
-### Local PostgreSQL (Recommended for Development)
-
-1. **Install PostgreSQL**: [https://www.postgresql.org/download/](https://www.postgresql.org/download/)
-
-2. **Create a database**:
-   ```sql
-   CREATE DATABASE campus_events;
-   ```
-
-3. **Execute schema** to create tables:
-   ```bash
-   # Windows (PowerShell)
-   psql -U postgres -d campus_events -f backend/schema.sql
-   
-   # Linux/Mac
-   psql -U postgres -d campus_events -f backend/schema.sql
-   ```
-
-4. **Update `backend/.env`** with your local credentials:
-   ```env
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=campus_events
-   DB_USER=postgres
-   DB_PASSWORD=your_local_password
-   JWT_SECRET=your_super_secret_jwt_key
-   PORT=5000
-   ```
-
-### Cloud PostgreSQL (Optional for Production)
-
-If deploying to production, you can use cloud providers like:
-- **Render** - Free PostgreSQL with 90-day retention
-- **Railway** - Easy PostgreSQL deployment
-- **Supabase** - PostgreSQL with additional features
-- **Neon** - Serverless PostgreSQL
-
-Update your `.env` with cloud credentials:
-```env
-DB_HOST=your-cloud-host.com
-DB_PORT=5432
-DB_NAME=campus_events
-DB_USER=your_username
-DB_PASSWORD=your_password
-JWT_SECRET=your_super_secret_jwt_key
 PORT=5000
-```
+DATABASE_URL=postgres://postgres:your_password@localhost:5432/campus_events_db
+JWT_SECRET=your_super_secret_jwt_key
 
-### 📊 Database Tables
+3. Start the backend Node server:
 
-The schema creates three core tables:
+npm start
 
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| **users** | Store user accounts with role-based fields | id, first_name, last_name, email, password (hashed), role, gr_number, department, division, year, designation |
-| **events** | Store event details | id, title, description, date, location, category, max_participants, registered_count |
-| **registrations** | Track user-event relationships | id, user_id, event_id, status, attended, certificate_issued |
+The server should now be listening on http://localhost:5000.
 
-#### Sample Data Included
-- ✅ Admin account (admin@vit.edu)
-- ✅ Coordinator account (rahul@vit.edu)
-- ✅ Student account (tejal@vit.edu / password: `password123`)
-- ✅ Student account (tejal@vit.edu / password: `password123`)
-- ✅ 3 sample events (Hackathon, Tech Talk, Cultural Fest)
-- ✅ Sample registrations
+### Step 3: Frontend Configuration and Execution
 
----
+1. Open a new terminal window, navigate to the frontend directory, and install dependencies:
+cd frontend
+npm install
 
-## 🚀 Running the Application
-
-### Development Mode
-
-Open **two terminal windows**:
-
-#### Terminal 1: Backend Server
-```bash
-cd backend
+2. Launch the Vite development server:
 npm run dev
-```
-✅ Backend runs on `http://localhost:5000`
 
-#### Terminal 2: Frontend Dev Server
-```bash
-npm run dev
-```
-✅ Frontend runs on `http://localhost:5173` (or port shown in terminal)
+3. Open your browser and navigate to http://localhost:5173.
 
-### Testing the Application
+## REST API Endpoint Summary
 
-1. **Open browser**: Navigate to `http://localhost:5173`
-2. **Login with sample account**:
-   - Email: `tejal@vit.edu`
-   - Password: `password123`
-3. **Test features**:
-   - Browse events on Events page
-   - Register for an event (watch button change to "Already Registered")
-   - Check points increase in navbar (100 points per registration)
-   - Edit profile and see navbar update immediately
-   - Try accessing different role dashboards (auto-redirects based on role)
+* POST /api/auth/login (Public): Authenticates credentials and returns JWT token
+* GET /api/events (Public/Student): Fetches live, upcoming, and past event cards
+* POST /api/events/:id/register (Student): Registers student for an event and deposits 100 points
+* POST /api/club/upload-report (Club President): Uploads multi-part event report PDF via FormData
+* PATCH /api/hod/events/:id/status (HOD): Updates event status to Approved or Rejected
+* GET /api/faculty/events/:id/export (Faculty): Retrieves aggregate registration data for CSV output
+* POST /api/dean/bulk-import (Dean): Processes mass student/faculty CSV onboardings
 
----
+## Authors and Project Team Members
 
-## 🏗️ Project Structure
+This project was engineered and developed by:
 
-```
-campus-events/
-├── backend/                    # Express.js API server
-│   ├── config/
-│   │   └── db.js              # PostgreSQL connection configuration
-│   ├── controllers/
-│   │   ├── authController.js  # Login, register, JWT validation
-│   │   └── eventController.js # Event CRUD, registration logic
-│   ├── middleware/
-│   │   └── auth.js            # JWT verification middleware
-│   ├── routes/
-│   │   ├── auth.js            # Auth endpoints: POST /login, /register
-│   │   ├── events.js          # Event endpoints: GET/POST /events
-│   │   └── users.js           # User endpoints: GET/PUT /profile
-│   ├── schema.sql              # Database schema and sample data
-│   ├── server.js              # Express app entry point
-│   ├── .env.example           # Environment template
-│   └── package.json
-│
-├── src/                        # React frontend
-│   ├── api/
-│   │   ├── axiosConfig.js     # ✅ Centralized Axios instance with JWT
-│   │   ├── authService.js     # Login/register API calls
-│   │   ├── eventService.js    # Event CRUD API calls
-│   │   └── userService.js     # Profile, registrations API calls
-│   ├── components/
-│   │   └── Navbar.jsx         # Global navbar with role-based links
-│   ├── context/
-│   │   └── AuthContext.jsx    # Global auth state + refreshUser()
-│   ├── pages/
-│   │   ├── Login.jsx          # Login with role-based redirect
-│   │   ├── Register.jsx       # User registration
-│   │   ├── Home.jsx           # Landing page
-│   │   ├── Events.jsx         # ✅ Live event dashboard with registration
-│   │   ├── Profile.jsx        # ✅ Editable profile with DB persistence
-│   │   ├── StudentDashboard.jsx      # Student-specific features
-│   │   ├── FacultyDashboard.jsx      # Faculty view with protection
-│   │   ├── DeanDashboard.jsx         # Admin approval dashboard
-│   │   └── CoordinatorDashboard.jsx  # Event creation and management
-│   ├── App.jsx                # ✅ Router with ProtectedRoute
-│   ├── main.jsx               # React entry point
-│   └── index.css              # Tailwind base styles
-│
-├── .gitignore                  # ✅ Excludes .env, node_modules, dist
-├── package.json
-├── vite.config.js
-├── tailwind.config.js
-└── README.md                   # This file
-```
+* Vedant Patkar
+* Tejal Jadhav
+* Sujal Patil
+* Siddhivinayak Patil
+* Vainteya Patole
 
----
+## License
 
-## 🔌 API Documentation
-
-### Base URL
-- **Development**: `http://localhost:5000/api`
-- **Production**: Update `VITE_API_URL` in .env
-
-### Authentication Endpoints
-
-#### `POST /api/auth/register`
-Register a new user account.
-
-**Request Body:**
-```json
-{
-  "name": "John Doe",
-  "email": "john@vit.edu",
-  "password": "securepassword",
-  "role": "student",
-  "branch": "CSE",
-  "year": "2nd"
-}
-```
-
-**Response:**
-```json
-{
-  "message": "User registered successfully",
-  "user": { "id": 5, "name": "John Doe", "email": "john@vit.edu", "role": "student" },
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-#### `POST /api/auth/login`
-Authenticate user and return JWT token.
-
-**Request Body:**
-```json
-{
-  "email": "tejal@vit.edu",
-  "password": "password123"
-}
-```
-
-**Response:**
-```json
-{
-  "message": "Login successful",
-  "user": { "id": 1, "name": "Tejal Jadhav", "role": "student", "points": 1240 },
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-### Event Endpoints
-
-#### `GET /api/events`
-Fetch all active events.
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Response:**
-```json
-[
-  {
-    "id": 1,
-    "title": "National Hackathon 2025",
-    "description": "24-hour coding marathon...",
-    "date": "2025-03-15T09:00:00Z",
-    "location": "Main Auditorium",
-    "category": "Hackathon",
-    "max_participants": 120,
-    "registered_count": 89,
-    "fees": "Free"
-  }
-]
-```
-
-#### `POST /api/events/register`
-Register for an event (adds 100 points).
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Request Body:**
-```json
-{
-  "event_id": 1
-}
-```
-
-**Response:**
-```json
-{
-  "message": "Registered successfully! 100 points added.",
-  "points_earned": 100
-}
-```
-
-### User Endpoints
-
-#### `GET /api/users/profile`
-Get authenticated user's profile with latest data.
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Response:**
-```json
-{
-  "id": 1,
-  "name": "Tejal Jadhav",
-  "email": "tejal@vit.edu",
-  "role": "student",
-  "points": 1340,
-  "branch": "BTech-Computer Engineering",
-  "year": "3rd Year"
-}
-```
-
-#### `PUT /api/users/profile`
-Update user profile (name, phone, bio, etc.).
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Request Body:**
-```json
-{
-  "name": "Tejal Updated",
-  "phone": "9876543210",
-  "bio": "Passionate about technology",
-  "interests": ["AI", "Web Development"],
-  "skills": ["React", "Node.js"]
-}
-```
-
-**Response:**
-```json
-{
-  "id": 1,
-  "name": "Tejal Updated",
-  "phone": "9876543210",
-  "bio": "Passionate about technology",
-  ...
-}
-```
-
-#### `GET /api/users/my-registrations`
-Fetch user's registered events.
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Response:**
-```json
-[
-  {
-    "event_id": 1,
-    "title": "National Hackathon 2025",
-    "date": "2025-03-15T09:00:00Z"
-  }
-]
-```
-
----
-
-## 🔒 Environment Security
-
-### ✅ Security Checklist
-- ✅ `.env` files are excluded from Git via `.gitignore`
-- ✅ `.env.example` provided for reference (no actual credentials)
-- ✅ JWT secrets use strong random strings in production
-- ✅ Passwords hashed with bcrypt (salt rounds: 10)
-- ✅ Role-based authentication with GR Number (Students) and Employee ID (Faculty)
-- ✅ CORS configured for specific origins in production
-- ✅ SQL injection prevented with parameterized queries
-- ✅ JWT verification middleware on protected routes
-
-### Production Deployment Best Practices
-
-1. **Environment Variables**:
-   - Never commit `.env` to version control
-   - Use platform-specific environment variable management (Vercel, Heroku, Railway)
-   - Rotate JWT secrets regularly
-
-2. **Database**:
-   - Use connection pooling for scalability
-   - Regular backups of PostgreSQL data
-   - Enable secure connections for cloud databases
-
-3. **Frontend**:
-   - Update `VITE_API_URL` to production backend URL
-   - Enable HTTPS for all connections
-   - Build with `npm run build` for optimized production bundle
-
-4. **Backend**:
-   - Set `NODE_ENV=production`
-   - Use process managers (PM2, Docker)
-   - Implement rate limiting for API endpoints
-   - Add monitoring (Sentry, LogRocket)
-
----
-
-## 📤 Git Deployment Strategy
-
-### Initial Repository Setup
-
-```bash
-# Initialize Git (if not already done)
-git init
-
-# Check current status
-git status
-
-# Add all files (respecting .gitignore)
-git add .
-
-# Verify .env is NOT added (should be excluded)
-git status
-
-# Commit with descriptive message
-git commit -m "feat: Complete Campus Event Management System
-
-- Multi-role authentication (Student, Faculty, Dean, Coordinator)
-- Live event dashboard with dynamic registration
-- Profile management with real-time state sync
-- Role-based dashboards with security redirects
-- PostgreSQL database with Neon Cloud integration
-- Centralized API configuration with JWT interceptors
-- Transaction-based event registration with duplicate prevention"
-
-# Add remote repository (replace with your GitHub repo)
-git remote add origin https://github.com/Tejal-Stac/campus-events.git
-
-# Push to main branch
-git push -u origin main
-```
-
-### Subsequent Updates
-
-```bash
-# Pull latest changes (if working in a team)
-git pull origin main
-
-# Make changes to code...
-
-# Stage changes
-git add .
-
-# Commit with descriptive message
-git commit -m "fix: Update profile persistence logic"
-
-# Push to remote
-git push origin main
-```
-
-### Branch Strategy (Recommended)
-
-```bash
-# Create feature branch
-git checkout -b feature/new-dashboard
-
-# Work on changes...
-git add .
-git commit -m "feat: Add volunteer dashboard"
-
-# Push feature branch
-git push origin feature/new-dashboard
-
-# Create pull request on GitHub, then merge to main
-```
-
-### Verify Before Pushing
-
-```bash
-# Ensure .env is NOT tracked
-git ls-files | grep .env
-# Should return nothing (or only .env.example)
-
-# Check ignored files are working
-git check-ignore -v backend/.env
-# Should show: .gitignore:5:backend/.env
-```
-
----
-
-## 🚢 Deployment Readiness
-
-### ✅ Verification Checklist
-
-#### API Configuration
-- ✅ All API calls use centralized `axiosConfig.js`
-- ✅ JWT token automatically attached via Axios interceptors
-- ✅ Base URL configurable via `VITE_API_URL` environment variable
-- ✅ Error handling with 401 auto-logout
-
-#### Hardcoded Data Removal
-- ✅ Events fetched from PostgreSQL (no hardcoded arrays)
-- ✅ User data from database via AuthContext
-- ✅ Registrations tracked in `registrations` table
-- ✅ Points calculated dynamically from backend
-- ✅ Profile updates persist to database
-
-#### Security
-- ✅ Role-based protection on all dashboards
-- ✅ JWT expiration handled gracefully
-- ✅ SQL injection prevention with parameterized queries
-- ✅ CORS configured for production origins
-
-#### Database
-- ✅ Local PostgreSQL with proper configuration
-- ✅ Schema includes indexes for performance
-- ✅ Transactions for atomic operations
-- ✅ Timestamps for audit trails
-
-### Production Deployment Platforms
-
-#### Frontend (Vercel - Recommended)
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel --prod
-
-# Set environment variables in Vercel dashboard
-VITE_API_URL=https://your-backend-url.com/api
-```
-
-#### Backend (Railway/Render)
-```bash
-# Railway deployment
-railway login
-railway init
-railway up
-
-# Add environment variables in dashboard
-# Connect to Neon PostgreSQL automatically
-```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these guidelines:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
----
-
-## 👥 Authors
-
-- **Tejal Jadhav** - Initial work - [Tejal-Stac](https://github.com/Tejal-Stac)
-- **Siddhivinayak Patil** - Ideation and functionality management  - [HighSiddhu56964](https://github.com/HighSiddhu56964)
-- **Vedant Patkar**
----
-
-## 🙏 Acknowledgments
-
-- VIT Pune for project inspiration
-- Neon Cloud for serverless PostgreSQL
-- React and Vite communities for excellent tooling
-- Tailwind CSS for modern styling utilities
-
----
-
-## 📞 Support
-
-For issues, questions, or contributions:
-- **GitHub Issues**: [Create an issue](https://github.com/Tejal-Stac/campus-events/issues)
-- **Email**: tejal@vit.edu
-
----
-
-**⭐ Star this repository if you found it helpful!**
+This project is open-source and available under the MIT License.
